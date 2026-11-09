@@ -203,7 +203,7 @@ Tokens live in `apple/Shared/Design` (also compiled for the watch and widgets); 
 | `apple/` | XcodeGen project (`apple/project.yml`): iOS, watchOS, macOS (`Mac/`) and visionOS (`Vision/`) apps, extensions, shared code in `Shared/`, tests; `apple/PersonaLink/` is the separate Mac menu bar app (`docs/operations/link.md`) |
 | `android/` | Kotlin + Compose: `app`, `core/*`, `feature/*`, `platform/*` (`docs/android/android.md`) |
 | `web/` | Web app (Vite + React + Tailwind) served by the hub (`docs/web/web.md`) |
-| `desktop/` | Desktop app for macOS, Windows and Linux, built with MyGo around the hub's web app (`docs/desktop/desktop.md`) |
+| `desktop/` | Desktop app for macOS, Windows and Linux in MyGo's native UI, talking to the hub's API (`docs/desktop/desktop.md`) |
 | `integrations/` | Agent runtime integrations and the runtime SDK (`docs/integrations/runtimes.md`) |
 | `sdk/`, `schema/`, `spec/` | Extension SDK, extension JSON Schemas, shared behavior specs and fixtures |
 | `scripts/` | Build, test, deploy, release, mock hub and config tools (`scripts/README.md`) |

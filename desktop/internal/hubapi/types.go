@@ -1,0 +1,306 @@
+// Package hubapi talks to a Persona hub the way the other clients do (docs/protocol/protocol.md): REST under
+// /api/v1 with a device token, and the WebSocket /api/v1/ws for pushes. It holds the wire types, only the fields
+// the desktop app reads, and has no MyGo dependency.
+package hubapi
+
+import (
+	"encoding/json"
+	"time"
+)
+
+// Agent states (docs/protocol/agent-states.md).
+const (
+	StateNeedsYou = "needs_you"
+	StateWorking  = "working"
+	StateUnread   = "unread"
+	StateIdle     = "idle"
+	StateOffline  = "offline"
+)
+
+// Machine is a computer of the hub.
+type Machine struct {
+	ID         string `json:"id"`
+	Name       string `json:"name"`
+	Online     bool   `json:"online"`
+	Error      string `json:"error,omitempty"`
+	Hostname   string `json:"hostname,omitempty"`
+	OS         string `json:"os,omitempty"`
+	Arch       string `json:"arch,omitempty"`
+	Kind       string `json:"kind,omitempty"`
+	Engine     string `json:"engine,omitempty"`
+	NodeVer    string `json:"node_version,omitempty"`
+	ClaudeVer  string `json:"claude_version,omitempty"`
+	HerdrVer   string `json:"herdr_version,omitempty"`
+	LastSeen   string `json:"last_seen,omitempty"`
+	HubName    string `json:"hub_name,omitempty"`
+	Trust      string `json:"trust,omitempty"`
+	ErrorCode  string `json:"error_code,omitempty"`
+	NodeBehind bool   `json:"node_mismatch,omitempty"`
+	System     *struct {
+		Name   string `json:"name,omitempty"`
+		Model  string `json:"model,omitempty"`
+		CPU    string `json:"cpu,omitempty"`
+		Cores  int    `json:"cores,omitempty"`
+		Memory int64  `json:"memory,omitempty"`
+	} `json:"system,omitempty"`
+}
+
+// Capabilities say what a session of another source allows (a session without source_kind allows everything).
+type Capabilities struct {
+	Read      bool `json:"read,omitempty"`
+	Send      bool `json:"send,omitempty"`
+	Interrupt bool `json:"interrupt,omitempty"`
+	Approve   bool `json:"approve,omitempty"`
+}
+
+// Session is an agent: a conversation of Claude Code, Codex or another runtime on one of the computers.
+type Session struct {
+	MachineID      string        `json:"machine_id"`
+	SessionID      string        `json:"session_id"`
+	Title          string        `json:"title"`
+	Cwd            string        `json:"cwd"`
+	Status         string        `json:"status"`
+	State          string        `json:"state,omitempty"`
+	StateSince     string        `json:"state_since,omitempty"`
+	Agent          string        `json:"agent,omitempty"`
+	AgentLabel     string        `json:"agent_label,omitempty"`
+	SourceKind     string        `json:"source_kind,omitempty"`
+	ReadOnly       string        `json:"read_only_reason,omitempty"`
+	Capabilities   *Capabilities `json:"capabilities,omitempty"`
+	Model          string        `json:"model,omitempty"`
+	PermissionMode string        `json:"permission_mode,omitempty"`
+	Effort         string        `json:"effort,omitempty"`
+	Assistant      bool          `json:"assistant,omitempty"`
+	Space          string        `json:"space,omitempty"`
+	SpaceName      string        `json:"space_name,omitempty"`
+	SlotName       string        `json:"slot_name,omitempty"`
+	UpdatedAt      string        `json:"updated_at,omitempty"`
+	SeenAt         string        `json:"seen_at,omitempty"`
+	LastText       string        `json:"last_text,omitempty"`
+	Asks           string        `json:"asks,omitempty"`
+	Activity       string        `json:"activity,omitempty"`
+	TurnError      string        `json:"turn_error,omitempty"`
+	Pending        int           `json:"pending_interactions,omitempty"`
+	Queued         []string      `json:"queued,omitempty"`
+	Rev            int64         `json:"rev,omitempty"`
+	Suggestion     string        `json:"suggestion,omitempty"`
+	Archived       bool          `json:"archived,omitempty"`
+	Quiet          bool          `json:"quiet,omitempty"`
+	Muted          bool          `json:"muted,omitempty"`
+	IsSubagent     bool          `json:"is_subagent,omitempty"`
+	ContextTokens  int           `json:"context_tokens,omitempty"`
+	ContextWindow  int           `json:"context_window,omitempty"`
+	Todo           *struct {
+		ID    string `json:"id"`
+		Title string `json:"title"`
+	} `json:"todo,omitempty"`
+}
+
+// Key identifies a session across machines.
+func (s Session) Key() string { return s.MachineID + "/" + s.SessionID }
+
+// Can tells whether the session allows an operation: "send", "interrupt" or "approve".
+func (s Session) Can(op string) bool {
+	if s.SourceKind == "" {
+		return true
+	}
+	if s.Capabilities == nil {
+		return false
+	}
+	switch op {
+	case "send":
+		return s.Capabilities.Send
+	case "interrupt":
+		return s.Capabilities.Interrupt
+	case "approve":
+		return s.Capabilities.Approve
+	}
+	return s.Capabilities.Read
+}
+
+// Updated is when the session last changed, or the zero time.
+func (s Session) Updated() time.Time { return parseTime(s.UpdatedAt) }
+
+// Item is one entry of a session's transcript.
+type Item struct {
+	ID        string         `json:"id"`
+	Seq       int64          `json:"seq"`
+	TS        string         `json:"ts,omitempty"`
+	Role      string         `json:"role"`
+	Kind      string         `json:"kind"`
+	Text      string         `json:"text,omitempty"`
+	ToolUseID string         `json:"tool_use_id,omitempty"`
+	ToolName  string         `json:"tool_name,omitempty"`
+	ToolInput map[string]any `json:"tool_input,omitempty"`
+	IsError   bool           `json:"is_error,omitempty"`
+	FullSize  int            `json:"full_size,omitempty"`
+	Queued    bool           `json:"queued,omitempty"`
+	From      string         `json:"from,omitempty"`
+	ClientMsg string         `json:"client_msg_id,omitempty"`
+	Image     *struct {
+		Mime string `json:"mime"`
+		Data string `json:"data,omitempty"`
+	} `json:"image,omitempty"`
+	Fold *struct {
+		Items    int   `json:"items"`
+		Tools    int   `json:"tools"`
+		Thoughts int   `json:"thoughts"`
+		Through  int64 `json:"through_seq"`
+	} `json:"fold,omitempty"`
+	Injected *struct {
+		Kind string `json:"kind"`
+		Line string `json:"line"`
+	} `json:"injected,omitempty"`
+}
+
+// ItemsPage is a page of a transcript.
+type ItemsPage struct {
+	Items   []Item `json:"items"`
+	HasMore bool   `json:"has_more,omitempty"`
+}
+
+// Question is one question of a question card.
+type Question struct {
+	Question    string `json:"question"`
+	Header      string `json:"header,omitempty"`
+	MultiSelect bool   `json:"multi_select,omitempty"`
+	Options     []struct {
+		Label       string `json:"label"`
+		Description string `json:"description,omitempty"`
+	} `json:"options,omitempty"`
+}
+
+// DialogOption is a choice of a terminal dialog the hub read off the screen.
+type DialogOption struct {
+	Key    string `json:"key"`
+	Label  string `json:"label"`
+	Detail string `json:"detail,omitempty"`
+	Kind   string `json:"kind,omitempty"`
+}
+
+// Interaction is a card an agent waits on: a question, a plan, a permission, a terminal dialog or an MCP form.
+type Interaction struct {
+	ID           string         `json:"id"`
+	MachineID    string         `json:"machine_id"`
+	SessionID    string         `json:"session_id"`
+	SessionTitle string         `json:"session_title,omitempty"`
+	Cwd          string         `json:"cwd,omitempty"`
+	Kind         string         `json:"kind"`
+	CreatedAt    string         `json:"created_at,omitempty"`
+	ToolName     string         `json:"tool_name,omitempty"`
+	Questions    []Question     `json:"questions,omitempty"`
+	Plan         string         `json:"plan,omitempty"`
+	ToolInput    map[string]any `json:"tool_input,omitempty"`
+	Summary      string         `json:"summary,omitempty"`
+	Screen       string         `json:"screen,omitempty"`
+	Secret       bool           `json:"secret,omitempty"`
+	Reason       string         `json:"reason,omitempty"`
+	AlwaysLabel  string         `json:"always_label,omitempty"`
+	Agent        string         `json:"agent,omitempty"`
+	Delegating   bool           `json:"delegating,omitempty"`
+	Dialog       *struct {
+		Header   string         `json:"header,omitempty"`
+		Question string         `json:"question,omitempty"`
+		Detail   string         `json:"detail,omitempty"`
+		Options  []DialogOption `json:"options,omitempty"`
+		Multi    bool           `json:"multi,omitempty"`
+	} `json:"dialog,omitempty"`
+	Fields []struct {
+		Key    string `json:"key"`
+		Label  string `json:"label"`
+		Secret bool   `json:"secret,omitempty"`
+	} `json:"fields,omitempty"`
+	Elicitation *struct {
+		Mode    string `json:"mode"`
+		Message string `json:"message,omitempty"`
+		URL     string `json:"url,omitempty"`
+	} `json:"elicitation,omitempty"`
+}
+
+// SessionKey is the key of the interaction's session.
+func (ix Interaction) SessionKey() string { return ix.MachineID + "/" + ix.SessionID }
+
+// Resolution answers a card (POST /interactions/{id}/resolve; server/internal/proto/interaction.go).
+type Resolution struct {
+	Allow    *bool             `json:"allow,omitempty"`
+	Always   bool              `json:"always,omitempty"`
+	Approve  *bool             `json:"approve,omitempty"`
+	Mode     string            `json:"mode,omitempty"`
+	Feedback string            `json:"feedback,omitempty"`
+	Answers  map[string]string `json:"answers,omitempty"`
+	Option   string            `json:"option,omitempty"`
+	Text     string            `json:"text,omitempty"`
+	Message  string            `json:"message,omitempty"`
+	Values   map[string]string `json:"values,omitempty"`
+	Action   string            `json:"action,omitempty"`
+	Dismiss  bool              `json:"dismiss,omitempty"`
+}
+
+// Assistant is the assistant's setup and its conversations (GET /api/v1/assistant).
+type Assistant struct {
+	MachineID     string    `json:"machine_id"`
+	Main          string    `json:"main,omitempty"`
+	Conversations []Session `json:"conversations"`
+}
+
+// InboxItem is an entry of the Inbox (docs/protocol/protocol.md "Inbox API").
+type InboxItem struct {
+	ID          string `json:"id"`
+	Source      string `json:"source"`
+	Kind        string `json:"kind"`
+	AccountName string `json:"account_name,omitempty"`
+	Title       string `json:"title"`
+	Sender      string `json:"sender,omitempty"`
+	Preview     string `json:"preview,omitempty"`
+	Count       int    `json:"count,omitempty"`
+	UpdatedAt   string `json:"updated_at,omitempty"`
+	Tier        string `json:"tier,omitempty"`
+	Summary     string `json:"summary,omitempty"`
+	Reason      string `json:"reason,omitempty"`
+	Read        bool   `json:"read,omitempty"`
+	DoneAt      string `json:"done_at,omitempty"`
+	DoneBy      string `json:"done_by,omitempty"`
+	Version     string `json:"version,omitempty"`
+	Connector   *struct {
+		Label    string `json:"label,omitempty"`
+		URL      string `json:"url,omitempty"`
+		CanReply bool   `json:"can_reply,omitempty"`
+	} `json:"connector,omitempty"`
+}
+
+// Done tells a handled entry.
+func (it InboxItem) Done() bool { return it.DoneAt != "" }
+
+// Hello is the hub's first WebSocket message.
+type Hello struct {
+	ServerVersion string   `json:"server_version"`
+	HubID         string   `json:"hub_id"`
+	HubName       string   `json:"hub_name"`
+	Features      []string `json:"features"`
+	FP            string   `json:"fp,omitempty"`
+	TLSPort       int      `json:"tls_port,omitempty"`
+	Locale        string   `json:"locale,omitempty"`
+}
+
+// Event is one WebSocket message from the hub: its type, and the whole message to decode by type.
+type Event struct {
+	Type string
+	Raw  json.RawMessage
+}
+
+// Decode reads the event into v.
+func (e Event) Decode(v any) error { return json.Unmarshal(e.Raw, v) }
+
+func parseTime(s string) time.Time {
+	if s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339Nano, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
+}
+
+// ParseTime reads the hub's RFC 3339 times, or the zero time.
+func ParseTime(s string) time.Time { return parseTime(s) }

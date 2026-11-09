@@ -82,28 +82,6 @@ func TestParseWebLink(t *testing.T) {
 	}
 }
 
-func TestHubPages(t *testing.T) {
-	h := Hub{URL: "https://proxy.example.com/p"}
-	for u, want := range map[string]bool{
-		"https://proxy.example.com/p":          true,
-		"https://proxy.example.com/p/settings": true,
-		"https://proxy.example.com/pp":         false,
-		"https://proxy.example.com/":           false,
-		"https://other.example.com/p/":         false,
-		"https://PROXY.example.com:443/p/a":    true,
-	} {
-		if h.Contains(u) != want {
-			t.Errorf("Contains(%q) = %v", u, !want)
-		}
-	}
-	if got := h.OpenURL("jp a"); got != "https://proxy.example.com/p/#token=jp+a" {
-		t.Errorf("OpenURL = %q", got)
-	}
-	if got := (Hub{URL: "https://hub.example.com"}).OpenURL(""); got != "https://hub.example.com/" {
-		t.Errorf("OpenURL = %q", got)
-	}
-}
-
 func TestPinned(t *testing.T) {
 	key, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	tmpl := &x509.Certificate{SerialNumber: big.NewInt(1), Subject: pkix.Name{CommonName: "hub"}, NotBefore: time.Now(), NotAfter: time.Now().Add(time.Hour)}
@@ -132,14 +110,6 @@ func TestPinned(t *testing.T) {
 	}
 }
 
-func TestBadgeFromTitle(t *testing.T) {
-	for title, want := range map[string]int{"(2) Persona": 2, "(12) Settings · Persona": 12, "Persona": 0, "(x) Persona": 0, "Persona (3) ": 0} {
-		if got := BadgeFromTitle(title); got != want {
-			t.Errorf("BadgeFromTitle(%q) = %d, want %d", title, got, want)
-		}
-	}
-}
-
 func TestStore(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "sub", "hubs.json")
 	s := Load(path)
@@ -154,9 +124,6 @@ func TestStore(t *testing.T) {
 	a, ok := s.Get("https://a.example.com")
 	if !ok || a.FP != "fp1" || a.Label != "Home" || a.HubID != "h" || a.Title() != "Home" {
 		t.Errorf("a = %+v", a)
-	}
-	if h, ok := s.ForPage("https://b.example.com/p/settings"); !ok || h.URL != "https://b.example.com/p" {
-		t.Errorf("ForPage = %+v", h)
 	}
 	s.Rename("https://b.example.com/p", "Work")
 	if s.Hubs[1].Title() != "Work" {

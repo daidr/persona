@@ -35,7 +35,7 @@ func TestCatalogsMatch(t *testing.T) {
 	}
 }
 
-// Every key the app's Go code and its connect page use is in the catalogs.
+// Every key the app's Go code uses is in the catalogs.
 func TestKeysUsed(t *testing.T) {
 	uses := []struct {
 		glob string
@@ -43,11 +43,10 @@ func TestKeysUsed(t *testing.T) {
 	}{
 		{"../../*.go", regexp.MustCompile(`\btr\("([a-zA-Z]+)"`)},
 		{"../../*.go", regexp.MustCompile(`\{"(go[A-Z][a-zA-Z]+)",`)},
-		{"../../*.go", regexp.MustCompile(`return "(error[A-Z][a-zA-Z]+)"`)},
-		{"../../frontend/*", regexp.MustCompile(`data-(?:t|ph)="([a-zA-Z]+)"`)},
-		{"../../frontend/*.js", regexp.MustCompile(`\bt\("([a-zA-Z]+)"`)},
+		{"../app/*.go", regexp.MustCompile(`\btr\("([a-zA-Z]+)"`)},
 	}
 	seen := 0
+	used := map[string]bool{}
 	for _, u := range uses {
 		files, _ := filepath.Glob(u.glob)
 		for _, f := range files {
@@ -57,13 +56,19 @@ func TestKeysUsed(t *testing.T) {
 			}
 			for _, m := range u.re.FindAllSubmatch(data, -1) {
 				seen++
+				used[string(m[1])] = true
 				if _, ok := catalogs["en"][string(m[1])]; !ok {
 					t.Errorf("%s uses %q, which isn't in the catalogs", f, m[1])
 				}
 			}
 		}
 	}
-	if seen < 40 {
+	for k := range catalogs["en"] {
+		if !used[k] {
+			t.Errorf("%q is in the catalogs but nothing uses it", k)
+		}
+	}
+	if seen < 100 {
 		t.Errorf("found only %d uses: did the files move?", seen)
 	}
 }
@@ -83,7 +88,7 @@ func TestTr(t *testing.T) {
 	if got := Tr("ja", "trayNeedsYou", "count", "3"); got != "3 件が対応待ち" {
 		t.Errorf("Tr = %q", got)
 	}
-	if got := Tr("fr", "addButton"); got != "Add" {
+	if got := Tr("fr", "signIn"); got != "Sign in" {
 		t.Errorf("fallback = %q", got)
 	}
 	if got := Tr("en", "missingKey"); got != "missingKey" {

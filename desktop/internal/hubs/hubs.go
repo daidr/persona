@@ -13,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -52,31 +51,6 @@ func (h Hub) Title() string {
 		return h.URL
 	}
 	return u.Host + strings.TrimSuffix(u.Path, "/")
-}
-
-// Origin is the hub's scheme://host[:port], the origin its pages run in.
-func (h Hub) Origin() string { return OriginOf(h.URL) }
-
-// OpenURL is the address the app loads for the hub: its web app's root, with a sign-in token in the fragment when
-// there is one. The fragment never reaches the server, and the web app takes it out of the address bar at once
-// (web/src/lib/auth.ts takeToken).
-func (h Hub) OpenURL(token string) string {
-	u := h.URL + "/"
-	if token != "" {
-		u += "#token=" + url.QueryEscape(token)
-	}
-	return u
-}
-
-// Contains reports whether rawURL is one of the hub's pages: the same origin, under its path prefix.
-func (h Hub) Contains(rawURL string) bool {
-	u, err := url.Parse(rawURL)
-	if err != nil || OriginOf(rawURL) != h.Origin() {
-		return false
-	}
-	base, _ := url.Parse(h.URL)
-	prefix := strings.TrimSuffix(base.Path, "/")
-	return prefix == "" || u.Path == prefix || strings.HasPrefix(u.Path, prefix+"/")
 }
 
 // OriginOf is the origin of an http(s) URL, with the scheme and host in lower case and a default port left out, or ""
@@ -249,31 +223,20 @@ func (h Hub) Pinned(host string, der []byte) bool {
 	return fp != "" && fp == h.FP
 }
 
-var badge = regexp.MustCompile(`^\((\d+)\) `)
-
-// BadgeFromTitle reads how many agents need the user from the web app's title, which then starts with "(N) "
-// (web/src/lib/attention-signals.ts), or 0.
-func BadgeFromTitle(title string) int {
-	m := badge.FindStringSubmatch(title)
-	if m == nil {
-		return 0
-	}
-	n, _ := strconv.Atoi(m[1])
-	return n
-}
-
 // Settings is what the app keeps besides the hubs.
 type Settings struct {
 	// Current is the URL of the hub the app opened last, which it opens at launch.
 	Current string `json:"current,omitempty"`
 	// NoShortcut turns the global shortcut off.
 	NoShortcut bool `json:"no_shortcut,omitempty"`
-	// NotificationsDenied is set when the system refused a notification, so the page sees "denied".
-	NotificationsDenied bool `json:"notifications_denied,omitempty"`
+	// NoNotifications turns the app's notifications off.
+	NoNotifications bool `json:"no_notifications,omitempty"`
+	// DeviceID names this install to the hub (client_hello device_id); made once.
+	DeviceID string `json:"device_id,omitempty"`
 }
 
-// Store is the list of hubs and the settings, kept as JSON in the app's data directory. It holds no secrets: the
-// web app keeps its own device token in the webview's storage of the hub's origin.
+// Store is the list of hubs and the settings, kept as JSON in the app's data directory. It holds no secrets: each
+// hub's device token is in the system's credential store (Keychain, Credential Manager, Secret Service).
 type Store struct {
 	path     string
 	Hubs     []Hub    `json:"hubs"`
@@ -317,18 +280,6 @@ func (s *Store) Get(rawURL string) (Hub, bool) {
 		}
 	}
 	return Hub{}, false
-}
-
-// ForPage returns the hub whose page rawURL is; with several (prefixes on one origin) the longest prefix.
-func (s *Store) ForPage(rawURL string) (Hub, bool) {
-	var best Hub
-	found := false
-	for _, h := range s.Hubs {
-		if h.Contains(rawURL) && (!found || len(h.URL) > len(best.URL)) {
-			best, found = h, true
-		}
-	}
-	return best, found
 }
 
 // Upsert adds the hub, or updates the one with its URL: a new pin or hub id replaces the old (it comes from a

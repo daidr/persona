@@ -10,7 +10,6 @@ import (
 	"strconv"
 
 	"github.com/egoist/mygo"
-	"github.com/nwverse/persona/desktop/internal/hubs"
 )
 
 // shortcut brings Persona to the front from any app.
@@ -23,41 +22,44 @@ func shortcutLabel() string {
 	return "Ctrl+Alt+P"
 }
 
-// pages are the web app's places the Go menu reaches, with their shortcuts (web/src/lib/router.ts).
+// pages are the places the Go menu reaches, with their shortcuts.
 var pages = []struct{ key, path, accel string }{
 	{"goPersona", "/", "CmdOrCtrl+1"},
 	{"goAgents", "/agents", "CmdOrCtrl+2"},
 	{"goInbox", "/inbox", "CmdOrCtrl+3"},
 	{"goMachines", "/machines", "CmdOrCtrl+4"},
-	{"goTodos", "/todos", "CmdOrCtrl+5"},
-	{"goKnowledge", "/kb", "CmdOrCtrl+6"},
 }
 
 // refreshMenus sets the app menu and the tray menu again, after the hubs, the badge or a setting changed.
 func (d *desktop) refreshMenus() {
+	if d.app == nil {
+		return
+	}
 	mygo.App.SetMenu(d.appMenu())
 	d.refreshTray()
 }
 
 func (d *desktop) hubItems() []*mygo.MenuItem {
-	d.mu.Lock()
-	list := append([]hubs.Hub(nil), d.store.Hubs...)
-	current := d.store.Settings.Current
-	d.mu.Unlock()
+	list := d.app.Hubs.Hubs
+	current := d.app.Hubs.Settings.Current
 	var items []*mygo.MenuItem
 	for _, h := range list {
-		h := h
+		url := h.URL
 		items = append(items, &mygo.MenuItem{
 			Label:   h.Title(),
 			Type:    mygo.MenuItemRadio,
-			Checked: h.URL == current,
-			Click:   func(*mygo.MenuItem, *mygo.Window) { go d.openHub(h, "") },
+			Checked: url == current,
+			Click: func(*mygo.MenuItem, *mygo.Window) {
+				d.show()
+				d.app.Switch(url)
+				d.redraw()
+			},
 		})
 	}
 	if len(items) > 0 {
 		items = append(items, mygo.Separator())
 	}
-	return append(items, &mygo.MenuItem{Label: d.tr("menuManageHubs"), Accelerator: "CmdOrCtrl+Shift+H", Click: func(*mygo.MenuItem, *mygo.Window) { d.openConnect() }})
+	return append(items, &mygo.MenuItem{Label: d.tr("menuManageHubs"), Accelerator: "CmdOrCtrl+Shift+H", Click: func(*mygo.MenuItem, *mygo.Window) { d.goTo("/settings") }})
 }
 
 func (d *desktop) loginItem() *mygo.MenuItem {
@@ -69,7 +71,7 @@ func (d *desktop) loginItem() *mygo.MenuItem {
 }
 
 func (d *desktop) appMenu() *mygo.Menu {
-	settings := &mygo.MenuItem{Label: d.tr("menuSettings"), Accelerator: "CmdOrCtrl+,", Click: func(*mygo.MenuItem, *mygo.Window) { go d.goTo("/settings") }}
+	settings := &mygo.MenuItem{Label: d.tr("menuSettings"), Accelerator: "CmdOrCtrl+,", Click: func(*mygo.MenuItem, *mygo.Window) { d.goTo("/settings") }}
 	var first *mygo.MenuItem
 	if runtime.GOOS == "darwin" {
 		first = &mygo.MenuItem{Label: "Persona", Submenu: []*mygo.MenuItem{
@@ -98,31 +100,23 @@ func (d *desktop) appMenu() *mygo.Menu {
 	var goItems []*mygo.MenuItem
 	for _, p := range pages {
 		path := p.path
-		goItems = append(goItems, &mygo.MenuItem{Label: d.tr(p.key), Accelerator: p.accel, Click: func(*mygo.MenuItem, *mygo.Window) { go d.goTo(path) }})
+		goItems = append(goItems, &mygo.MenuItem{Label: d.tr(p.key), Accelerator: p.accel, Click: func(*mygo.MenuItem, *mygo.Window) { d.goTo(path) }})
 	}
 	goItems = append(goItems, mygo.Separator(),
-		&mygo.MenuItem{Label: d.tr("menuBack"), Accelerator: "CmdOrCtrl+[", Click: func(_ *mygo.MenuItem, w *mygo.Window) {
-			if w != nil && w.Page() != nil && w.Page().CanGoBack() {
-				w.Page().GoBack()
-			}
+		&mygo.MenuItem{Label: d.tr("menuBack"), Accelerator: "CmdOrCtrl+[", Click: func(*mygo.MenuItem, *mygo.Window) {
+			d.app.Back()
+			d.redraw()
 		}},
-		&mygo.MenuItem{Label: d.tr("menuForward"), Accelerator: "CmdOrCtrl+]", Click: func(_ *mygo.MenuItem, w *mygo.Window) {
-			if w != nil && w.Page() != nil && w.Page().CanGoForward() {
-				w.Page().GoForward()
-			}
+		&mygo.MenuItem{Label: d.tr("menuForward"), Accelerator: "CmdOrCtrl+]", Click: func(*mygo.MenuItem, *mygo.Window) {
+			d.app.Forward()
+			d.redraw()
 		}})
 	view := []*mygo.MenuItem{
-		{Role: mygo.RoleReload},
-		{Role: mygo.RoleForceReload},
-		mygo.Separator(),
 		{Role: mygo.RoleResetZoom},
 		{Role: mygo.RoleZoomIn},
 		{Role: mygo.RoleZoomOut},
 		mygo.Separator(),
 		{Role: mygo.RoleToggleFullScreen},
-	}
-	if mygo.IsDev() {
-		view = append(view, mygo.Separator(), &mygo.MenuItem{Role: mygo.RoleToggleDevTools})
 	}
 	return mygo.NewMenu([]*mygo.MenuItem{
 		first,
@@ -135,12 +129,10 @@ func (d *desktop) appMenu() *mygo.Menu {
 }
 
 func (d *desktop) trayMenu() *mygo.Menu {
-	d.mu.Lock()
 	n := d.badge
-	d.mu.Unlock()
 	items := []*mygo.MenuItem{{Label: d.tr("trayShow"), Click: func(*mygo.MenuItem, *mygo.Window) { d.show() }}}
 	if n > 0 {
-		items = append(items, &mygo.MenuItem{Label: d.tr("trayNeedsYou", "count", strconv.Itoa(n)), Click: func(*mygo.MenuItem, *mygo.Window) { go d.goTo("/agents") }})
+		items = append(items, &mygo.MenuItem{Label: d.tr("trayNeedsYou", "count", strconv.Itoa(n)), Click: func(*mygo.MenuItem, *mygo.Window) { d.goTo("/agents") }})
 	}
 	items = append(items, mygo.Separator())
 	items = append(items, d.hubItems()...)
@@ -166,12 +158,10 @@ func (d *desktop) setupTray() {
 // refreshTray shows the badge in the tray: a dot on the icon, the count beside it on macOS, the tooltip, and the
 // menu's line that opens the agents.
 func (d *desktop) refreshTray() {
-	if d.tray == nil {
+	if d.tray == nil || d.app == nil {
 		return
 	}
-	d.mu.Lock()
 	n := d.badge
-	d.mu.Unlock()
 	if err := d.tray.SetIcon(trayIcon(n > 0), true); err != nil {
 		log.Println("tray icon:", err)
 	}
@@ -188,15 +178,13 @@ func (d *desktop) refreshTray() {
 }
 
 func (d *desktop) applyShortcut() {
-	d.mu.Lock()
-	off := d.store.Settings.NoShortcut
-	d.mu.Unlock()
+	off := d.app.Hubs.Settings.NoShortcut
 	registered := mygo.GlobalShortcut.IsRegistered(shortcut)
 	switch {
 	case off && registered:
 		mygo.GlobalShortcut.Unregister(shortcut)
 	case !off && !registered:
-		if err := mygo.GlobalShortcut.Register(shortcut, d.toggle); err != nil {
+		if err := mygo.GlobalShortcut.Register(shortcut, func() { mygo.RunOnMain(d.toggle) }); err != nil {
 			log.Println("global shortcut:", err)
 		}
 	}
