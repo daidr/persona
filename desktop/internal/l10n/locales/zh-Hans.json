@@ -215,5 +215,16 @@
   "changesRenamed": "由 {path} 重命名",
   "changesBinary": "二进制文件，没有可显示的差异",
   "changesNoDiff": "没有可显示的差异",
-  "changesTruncated": "差异太长，其余部分未显示。"
+  "changesTruncated": "差异太长，其余部分未显示。",
+  "personaMain": "主对话",
+  "personaNew": "新对话",
+  "personaNewHint": "独立于主对话的一段对话",
+  "personaNewTitle": "要 Persona 做什么？",
+  "personaChats": "对话",
+  "personaArchived": "已归档",
+  "personaArchive": "归档",
+  "personaUnarchive": "取消归档",
+  "cardDrawing": "正在生成卡片…",
+  "cardBack": "返回",
+  "cardConfirm": "继续"
 }

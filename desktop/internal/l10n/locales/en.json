@@ -215,5 +215,16 @@
   "changesRenamed": "renamed from {path}",
   "changesBinary": "A binary file: no diff to show",
   "changesNoDiff": "No differences to show",
-  "changesTruncated": "The diff is too long; the rest isn't shown."
+  "changesTruncated": "The diff is too long; the rest isn't shown.",
+  "personaMain": "Main chat",
+  "personaNew": "New chat",
+  "personaNewHint": "A chat of its own, beside the main one",
+  "personaNewTitle": "What should Persona do?",
+  "personaChats": "Chats",
+  "personaArchived": "Archived",
+  "personaArchive": "Archive",
+  "personaUnarchive": "Unarchive",
+  "cardDrawing": "Drawing a card…",
+  "cardBack": "Back",
+  "cardConfirm": "Continue"
 }

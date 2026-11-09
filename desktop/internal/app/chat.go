@@ -193,6 +193,11 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 			return
 		}
 	}
+	// an assistant chat's cards can be answered
+	conversation := ""
+	if persona || x.Assistant {
+		_, conversation, _ = strings.Cut(key, "/")
+	}
 	items := visibleItems(t.Items)
 	live := strings.TrimSpace(t.Live)
 	n := len(items)
@@ -223,7 +228,7 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 				return
 			}
 			if i-extra < len(items) {
-				a.itemView(c, p, st, items[i-extra])
+				a.itemView(c, p, st, items[i-extra], conversation)
 				return
 			}
 			markdown.Stream(c, live, &a.md)
@@ -266,7 +271,7 @@ func visibleItems(all []hubapi.Item) []hubapi.Item {
 	return out
 }
 
-func (a *App) itemView(c *ui.Context, p palette, st *chatState, it hubapi.Item) {
+func (a *App) itemView(c *ui.Context, p palette, st *chatState, it hubapi.Item, conversation string) {
 	switch {
 	case it.Role == "user" && it.Kind == "text":
 		ui.Column(c).AlignItems(ui.End).Children(func() {
@@ -278,7 +283,7 @@ func (a *App) itemView(c *ui.Context, p palette, st *chatState, it hubapi.Item) 
 			}
 		})
 	case it.Kind == "text":
-		markdown.View(c.Key(it.ID), it.Text, &a.md)
+		a.richText(c, p, it, conversation)
 	case it.Kind == "thinking":
 		open := st.open[it.ID]
 		ui.Collapsible(c.Key(it.ID), a.tr("thinking"), &open, func() {
@@ -351,21 +356,4 @@ func (a *App) composer(c *ui.Context, p palette, key string, x hubapi.Session, k
 			a.send(key, text)
 		}
 	})
-}
-
-// personaPage is the assistant's main chat.
-func (a *App) personaPage(c *ui.Context, p palette) {
-	d := a.conn.data
-	main, ok := d.MainConversation()
-	a.pageHeader(c, p, a.tr("goPersona"), a.tr("personaSubtitle"), nil)
-	ui.Divider(c)
-	if !ok {
-		if !a.conn.loaded {
-			ui.Spinner(c).Margin(ui.Auto)
-			return
-		}
-		a.empty(c, p, "spark", a.tr("personaNone"), a.tr("personaNoneHint"))
-		return
-	}
-	a.chatView(c, p, main.Key(), true)
 }

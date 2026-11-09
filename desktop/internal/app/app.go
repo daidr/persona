@@ -77,6 +77,8 @@ type App struct {
 	kb      kbPage
 	terms   map[string]*termState
 	gits    map[string]*changesState
+	cards   map[string]*cardState
+	persona personaState
 	start   startForm
 	badge   int
 	toasts  []string

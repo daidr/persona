@@ -226,3 +226,30 @@ func TestCan(t *testing.T) {
 		t.Fatal("capabilities")
 	}
 }
+
+func TestSplitViews(t *testing.T) {
+	text := "Here:\r\n\r\n~~~~Persona-View\n{\"fallback\":\"F\",\"sections\":[{\"items\":[{\"type\":\"row\",\"title\":\"A\",\"action\":{\"id\":\"a\",\"reply\":\"pick A\"}}]}]}\n~~~~\n" +
+		"```go\n```persona-view\nnot a card\n```\n" +
+		"```persona-view\n{bad\n```\n" +
+		"```persona-view\n{\"type\":\"metric\",\"label\":\"Steps\",\"value\":\"8432\",\"fallback\":\"8432 steps\"}\n```\n" +
+		"after\n```persona-view\n{\"sec"
+	parts := SplitViews(text)
+	if len(parts) != 7 {
+		t.Fatalf("%d parts: %+v", len(parts), parts)
+	}
+	if parts[0].Markdown != "Here:" || parts[1].View == nil || parts[1].Index != 0 || parts[1].View.Sections[0].Items[0].Action.Reply != "pick A" {
+		t.Fatalf("first card %+v", parts[1])
+	}
+	if !strings.Contains(parts[2].Markdown, "not a card") {
+		t.Fatalf("code kept: %+v", parts[2])
+	}
+	if !parts[3].IsView || parts[3].View != nil || parts[3].Index != 1 {
+		t.Fatalf("invalid block %+v", parts[3])
+	}
+	if parts[4].View == nil || parts[4].View.Fallback != "8432 steps" || parts[4].View.Sections[0].Items[0].Value != "8432" || parts[4].Index != 2 {
+		t.Fatalf("shorthand %+v", parts[4])
+	}
+	if parts[5].Markdown != "after" || !parts[6].Open || parts[6].Index != 3 {
+		t.Fatalf("open block %+v %+v", parts[5], parts[6])
+	}
+}

@@ -618,3 +618,80 @@ func getJSON(t *testing.T, u string, out any) {
 		t.Fatal(err)
 	}
 }
+
+func TestAssistantChatsAndCards(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	d := a.conn.data
+	open, _ := a.conversations()
+	if len(open) < 2 || open[0].SessionID != d.Assistant.Main {
+		t.Fatalf("conversations %+v", open)
+	}
+	tt := ui.NewTester(a.View, 1280, 1000)
+	tt.Frame()
+	if !tt.HasText(a.tr("personaMain")) || !tt.HasText(titleOf(open[1])) {
+		t.Fatalf("list: %q", tt.Texts())
+	}
+	// another chat opens beside the list
+	if err := tt.Click(titleOf(open[1])); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.Path() != "/persona/"+open[1].SessionID || !tt.HasText(a.tr("personaArchive")) {
+		t.Fatalf("at %s: %q", a.Path(), tt.Texts())
+	}
+
+	// a card in the main chat: drawn, a row's reply answers it
+	main, _ := d.MainConversation()
+	view := `{"title":"Which option?","fallback":"Recommend B.","sections":[{"items":[` +
+		`{"type":"row","title":"A Rewrite","subtitle":"3 days","action":{"id":"a","reply":"Choose A"}},` +
+		`{"type":"row","title":"B Deduplicate","badge":{"text":"Recommended","tone":"positive"},"action":{"id":"b","reply":"Choose B"}},` +
+		`{"type":"stat_grid","stats":[{"label":"Queue","value":"1,204","tone":"caution"},{"label":"Errors","value":"3"}]},` +
+		`{"type":"progress","label":"Migrated","ratio":0.62},` +
+		`{"type":"table","columns":[{"title":"Day"},{"title":"Runs","align":"end"}],"rows":[["Mon","12"],["Tue","9"]]},` +
+		`{"type":"chart","kind":"bar"}]}]}`
+	tr := d.Transcript(main.Key())
+	tr.Merge([]hubapi.Item{{ID: "card-1", Seq: 9999, Role: "assistant", Kind: "text", Text: "Three ways:\n\n```persona-view\n" + view + "\n```\n\nB is the quickest."}})
+	a.Navigate("/")
+	tt.Frame()
+	a.chat(main.Key()).list.ScrollToEnd()
+	for range 30 {
+		tt.Frame()
+	}
+	if !tt.HasText("Which option?") || !tt.HasText("1,204") || !tt.HasText("62%") || !tt.HasText("Recommend B.") || !tt.HasText("B is the quickest.") {
+		t.Fatalf("card: %q", tt.Texts())
+	}
+	shot(t, tt, "assistant-card-light")
+	tt.SetDark(true)
+	shot(t, tt, "assistant-card-dark")
+	tt.SetDark(false)
+	if err := tt.Click("B Deduplicate"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if len(a.toasts) > 0 || a.cardOf("card-1/0").busy {
+		t.Fatalf("card action: %q", a.toasts)
+	}
+
+	a.openTarget("persona://session/macbook/s%2F1")
+	if a.Path() != "/agents/macbook/s/1" {
+		t.Fatalf("open session: %s", a.Path())
+	}
+	a.openTarget("persona://task/t1")
+	if a.Path() != "/todos/t1" {
+		t.Fatalf("open task: %s", a.Path())
+	}
+	a.openTarget("javascript:alert(1)")
+	if a.Path() != "/todos/t1" {
+		t.Fatal("opened a script")
+	}
+
+	// a new chat starts with its first message
+	a.Navigate("/persona/new")
+	tt.Frame()
+	a.persona.draft = "Plan my week"
+	a.startConversation()
+	tt.Frame()
+	if !strings.HasPrefix(a.Path(), "/persona/") || a.Path() == "/persona/new" {
+		t.Fatalf("new chat at %s", a.Path())
+	}
+}

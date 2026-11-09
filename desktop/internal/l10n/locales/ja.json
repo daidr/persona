@@ -215,5 +215,16 @@
   "changesRenamed": "{path} から名前変更",
   "changesBinary": "バイナリファイルのため差分はありません",
   "changesNoDiff": "表示する差分はありません",
-  "changesTruncated": "差分が長すぎるため、残りは表示されません。"
+  "changesTruncated": "差分が長すぎるため、残りは表示されません。",
+  "personaMain": "メインチャット",
+  "personaNew": "新しいチャット",
+  "personaNewHint": "メインとは別のチャット",
+  "personaNewTitle": "Persona に何をしてもらいますか？",
+  "personaChats": "チャット",
+  "personaArchived": "アーカイブ",
+  "personaArchive": "アーカイブ",
+  "personaUnarchive": "アーカイブ解除",
+  "cardDrawing": "カードを作成中…",
+  "cardBack": "戻る",
+  "cardConfirm": "続ける"
 }

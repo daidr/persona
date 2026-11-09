@@ -25,7 +25,10 @@ func (a *App) View(c *ui.Context) {
 				switch {
 				case r.Match("/"):
 					r.Title(a.tr("goPersona"))
-					a.personaPage(c, p)
+					a.personaPage(c, p, "")
+				case r.Match("/persona/{id...}"):
+					r.Title(a.tr("goPersona"))
+					a.personaPage(c, p, r.Param("id"))
 				case r.Match("/agents"):
 					r.Title(a.tr("goAgents"))
 					a.agentsView(c, p, "")
@@ -60,7 +63,7 @@ func (a *App) View(c *ui.Context) {
 					r.Title(a.tr("goSettings"))
 					a.settingsView(c, p)
 				default:
-					a.personaPage(c, p)
+					a.personaPage(c, p, "")
 				}
 			})
 		})

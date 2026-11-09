@@ -432,3 +432,30 @@ func (c *Client) GitDiff(ctx context.Context, machine, cwd, path string, staged 
 	err := c.Do(ctx, http.MethodGet, "/machines/"+url.PathEscape(machine)+"/git/diff?"+q.Encode(), nil, &out)
 	return out, err
 }
+
+// StartConversation starts one of the assistant's chats with its first message.
+func (c *Client) StartConversation(ctx context.Context, prompt string) (Session, error) {
+	var out struct {
+		Session Session `json:"session"`
+	}
+	err := c.Do(ctx, http.MethodPost, "/assistant/conversations", map[string]any{"prompt": prompt}, &out)
+	return out.Session, err
+}
+
+// ArchiveConversation hides one of the assistant's chats from its list, or brings it back.
+func (c *Client) ArchiveConversation(ctx context.Context, id string, archive bool) error {
+	op := "/archive"
+	if !archive {
+		op = "/unarchive"
+	}
+	return c.Do(ctx, http.MethodPost, "/assistant/conversations/"+url.PathEscape(id)+op, map[string]any{}, nil)
+}
+
+// ViewAction answers a card in one of the assistant's chats with one of its reply actions.
+func (c *Client) ViewAction(ctx context.Context, conversation, key, action, page, clientMsg string) error {
+	body := map[string]any{"action": action, "client_msg_id": clientMsg}
+	if page != "" {
+		body["page"] = page
+	}
+	return c.Do(ctx, http.MethodPost, "/assistant/conversations/"+url.PathEscape(conversation)+"/views/"+url.PathEscape(key)+"/actions", body, nil)
+}
