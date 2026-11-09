@@ -81,7 +81,7 @@ github:nwverse/persona-extensions
 
 ## 文档
 
-[开始使用](docs/operations/getting-started.md) · [架构](docs/server/architecture.md) · [协议](docs/protocol/protocol.md) · [Docker](docs/operations/docker.md) · [iOS](docs/apple/ios.md) · [Mac](docs/apple/mac.md) · [Android](docs/android/android.md) · [网页](docs/web/web.md) · [全部文档](CLAUDE.md#docs-index)
+[开始使用](docs/operations/getting-started.md) · [架构](docs/server/architecture.md) · [协议](docs/protocol/protocol.md) · [Docker](docs/operations/docker.md) · [iOS](docs/apple/ios.md) · [Mac](docs/apple/mac.md) · [Android](docs/android/android.md) · [网页](docs/web/web.md) · [桌面版](docs/desktop/desktop.md) · [全部文档](CLAUDE.md#docs-index)
 
 ## License
 

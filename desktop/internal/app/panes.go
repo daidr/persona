@@ -1,0 +1,457 @@
+package app
+
+import (
+	"context"
+	"strings"
+	"time"
+
+	"github.com/egoist/mygo/ui"
+
+	"github.com/nwverse/persona/desktop/internal/hubapi"
+)
+
+// An agent's page shows its chat, its terminal or its changes.
+const (
+	paneChat = iota
+	paneTerminal
+	paneChanges
+	paneFiles
+	panePreview
+)
+
+// termState is an agent's terminal as last read, and what is being typed into it.
+type termState struct {
+	screen  hubapi.Screen
+	loaded  bool
+	loading bool
+	read    time.Time
+	err     string
+	input   string
+	sending bool
+	// history is the scrollback read above the screen, oldest first; more says there is more of it.
+	history  []string
+	histMore bool
+	histRead bool
+	histBusy bool
+	histErr  string
+	scroll   ui.ScrollState
+	follow   bool
+}
+
+// changesState is the agent's folder's Git status and the diffs read.
+type changesState struct {
+	status  hubapi.GitStatus
+	loaded  bool
+	loading bool
+	err     string
+	chosen  string
+	diffs   map[string]*diffState
+	git     gitState
+}
+
+type diffState struct {
+	diff    hubapi.GitDiff
+	loaded  bool
+	loading bool
+	err     string
+}
+
+// termEvery is how often the terminal is read while it is shown.
+const termEvery = 1500 * time.Millisecond
+
+func (a *App) term(key string) *termState {
+	if a.terms == nil {
+		a.terms = map[string]*termState{}
+	}
+	s := a.terms[key]
+	if s == nil {
+		s = &termState{follow: true}
+		a.terms[key] = s
+	}
+	return s
+}
+
+// readScreen reads the terminal when it is due, and asks for a frame when the next read is.
+func (a *App) readScreen(key string) {
+	st := a.term(key)
+	if st.loading || time.Since(st.read) < termEvery {
+		return
+	}
+	st.loading = true
+	c := a.conn
+	machine, session, _ := strings.Cut(key, "/")
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		scr, err := c.client.ScreenANSI(ctx, machine, session, 60)
+		a.Host.Post(func() {
+			st.loading, st.read = false, time.Now()
+			if !a.live(c) {
+				return
+			}
+			if err != nil {
+				st.err = a.errorText(err)
+			} else {
+				st.screen, st.loaded, st.err = scr, true, ""
+			}
+			// a frame when the next read is due; a page that no longer shows the terminal reads nothing
+			a.After(termEvery, func() {})
+		})
+	})
+}
+
+// sendKeys types into the terminal and reads it again soon after.
+func (a *App) sendKeys(key, text string, keys ...string) {
+	st := a.term(key)
+	c := a.conn
+	machine, session, _ := strings.Cut(key, "/")
+	st.sending = true
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		err := c.client.Keys(ctx, machine, session, text, keys...)
+		a.Host.Post(func() {
+			st.sending = false
+			if !a.live(c) {
+				return
+			}
+			if err != nil {
+				a.toast(a.errorText(err))
+				return
+			}
+			st.read = time.Time{}
+		})
+	})
+}
+
+func (a *App) changes(key string) *changesState {
+	if a.gits == nil {
+		a.gits = map[string]*changesState{}
+	}
+	s := a.gits[key]
+	if s == nil {
+		s = &changesState{diffs: map[string]*diffState{}}
+		a.gits[key] = s
+	}
+	return s
+}
+
+func (a *App) readChanges(key string, x hubapi.Session) {
+	st := a.changes(key)
+	if st.loading {
+		return
+	}
+	st.loading, st.err = true, ""
+	c := a.conn
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		gs, err := c.client.GitStatus(ctx, x.MachineID, x.Cwd)
+		a.Host.Post(func() {
+			st.loading = false
+			if !a.live(c) {
+				return
+			}
+			if err != nil {
+				st.err = a.errorText(err)
+				return
+			}
+			a.setGitStatus(st, gs)
+		})
+	})
+}
+
+// staged tells a change only in the index, whose diff is the staged one.
+func staged(f hubapi.GitFile) bool {
+	return f.Index != "." && f.Index != "?" && f.Index != "" && (f.Worktree == "." || f.Worktree == "")
+}
+
+func (a *App) readDiff(key string, x hubapi.Session, f hubapi.GitFile) *diffState {
+	st := a.changes(key)
+	ds := st.diffs[f.Path]
+	if ds == nil {
+		ds = &diffState{}
+		st.diffs[f.Path] = ds
+	}
+	if ds.loaded || ds.loading || ds.err != "" {
+		return ds
+	}
+	ds.loading = true
+	c := a.conn
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		d, err := c.client.GitDiff(ctx, x.MachineID, x.Cwd, f.Path, staged(f))
+		a.Host.Post(func() {
+			ds.loading = false
+			if err != nil {
+				ds.err = a.errorText(err)
+				return
+			}
+			ds.diff, ds.loaded = d, true
+		})
+	})
+	return ds
+}
+
+// fileMark is a changed file's one letter: A added, D deleted, R renamed, ? new and not tracked, M changed.
+func fileMark(f hubapi.GitFile) string {
+	for _, s := range []string{f.Worktree, f.Index} {
+		if s == "?" {
+			return "?"
+		}
+	}
+	for _, s := range []string{f.Index, f.Worktree} {
+		if s != "" && s != "." {
+			return s
+		}
+	}
+	return "M"
+}
+
+func (p palette) markColor(mark string) ui.Color {
+	switch mark {
+	case "A", "?":
+		return p.green
+	case "D":
+		return p.red
+	case "R":
+		return p.accent
+	}
+	return p.orange
+}
+
+// changesPane is the agent's folder's Git: its changes beside the chosen file's diff, or its history beside the chosen
+// commit; on a hub with git_write, staging, committing, pushing, branches, stashes and the branch's pull request too.
+func (a *App) changesPane(c *ui.Context, p palette, key string, x hubapi.Session) {
+	if x.Cwd == "" {
+		a.empty(c, p, "git", a.tr("changesNoFolder"), "")
+		return
+	}
+	st := a.changes(key)
+	g := &st.git
+	if !st.loaded && !st.loading && st.err == "" {
+		a.readChanges(key, x)
+	}
+	gs := st.status
+	writable := a.gitWritable() && gs.IsRepo
+	ui.Row(c).Padding(10, pagePad).Gap(10).BorderWidth(0, 0, 1, 0).BorderColor(p.line).Children(func() {
+		ui.Icon(c, icon("git")).TextColor(p.ink2)
+		ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {
+			line := gs.Branch
+			if gs.Upstream != "" {
+				line += " → " + gs.Upstream
+			}
+			if gs.Ahead > 0 {
+				line += "  ↑" + itoa(gs.Ahead)
+			}
+			if gs.Behind > 0 {
+				line += "  ↓" + itoa(gs.Behind)
+			}
+			ui.Text(c, line).Bold().SingleLine()
+			if gs.Gone {
+				ui.Text(c, a.tr("changesUpstreamGone")).FontSize(small).TextColor(p.orange).SingleLine()
+			}
+			if gs.Head != nil {
+				ui.Text(c, gs.Head.Short+" · "+gs.Head.Subject).FontSize(small).TextColor(p.ink2).SingleLine()
+			}
+		})
+		if st.loading || g.busy != "" {
+			ui.Spinner(c)
+		}
+		if writable {
+			a.gitActions(c, p, key, x)
+		}
+		if ui.Button(c, a.tr("changesRefresh")).Disabled(st.loading).Clicked() {
+			a.readChanges(key, x)
+		}
+	})
+	switch {
+	case st.err != "" && !st.loaded:
+		a.empty(c, p, "warning", st.err, "")
+		return
+	case !st.loaded:
+		ui.Spinner(c).Margin(ui.Auto)
+		return
+	case !gs.IsRepo:
+		a.empty(c, p, "git", a.tr("changesNotRepo"), x.Cwd)
+		return
+	}
+	if writable {
+		a.gitDialogs(c, p, key, x)
+	}
+	var chosen hubapi.GitFile
+	for _, f := range gs.Files {
+		if f.Path == st.chosen {
+			chosen = f
+		}
+	}
+	ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
+		ui.Column(c).Width(300).BorderWidth(0, 1, 0, 0).BorderColor(p.line).Children(func() {
+			ui.Segmented(c.Key("git-tab-"+key), &g.tab, a.tr("gitChanges", "count", itoa(len(gs.Files))), a.tr("gitHistory")).Margin(8, 8, 0, 8)
+			ui.Scroll(c.Key("files-" + key)).Grow(1).Children(func() {
+				ui.Column(c).Padding(6).Children(func() {
+					if writable {
+						a.prCard(c, p, key, x)
+					}
+					if g.tab == 1 {
+						a.historyList(c, p, key, x)
+						return
+					}
+					if len(gs.Files) == 0 {
+						ui.Text(c, a.tr("changesNone")).FontSize(small).TextColor(p.ink3).Padding(8)
+					}
+					for _, f := range gs.Files {
+						a.fileRow(c, p, key, x, st, f, writable)
+					}
+				})
+			})
+			if writable && g.tab == 0 && len(gs.Files) > 0 {
+				a.gitBar(c, p, key, x)
+			}
+		})
+		ui.Column(c).Grow(1).Shrink(1).Children(func() {
+			switch {
+			case g.tab == 1 && g.commit != "":
+				a.commitView(c, p, key, x, g.commit)
+			case g.tab == 1:
+				a.empty(c, p, "git", a.tr("gitPickCommit"), "")
+			case len(gs.Files) == 0:
+				a.empty(c, p, "check", a.tr("changesNone"), a.tr("changesNoneHint"))
+			case chosen.Path == "":
+				a.empty(c, p, "read", a.tr("changesPick"), "")
+			default:
+				a.diffView(c, p, key, x, chosen)
+			}
+		})
+	})
+}
+
+func (a *App) fileRow(c *ui.Context, p palette, key string, x hubapi.Session, st *changesState, f hubapi.GitFile, writable bool) {
+	on := f.Path == st.chosen
+	bg := ui.Transparent
+	if on {
+		bg = p.hover
+	}
+	name, dir := f.Path, ""
+	if i := strings.LastIndex(f.Path, "/"); i >= 0 {
+		name, dir = f.Path[i+1:], f.Path[:i]
+	}
+	row := ui.ButtonBase(c.Key("f-"+f.Path)).Padding(6, 8).Radius(rowRadius).Gap(8).Background(bg).Label(f.Path)
+	row.Children(func() {
+		if writable {
+			a.stageBox(c, key, x, f)
+		}
+		mark := fileMark(f)
+		ui.Text(c, mark).Font("monospace").FontSize(small).Bold().TextColor(p.markColor(mark)).Width(12)
+		ui.Column(c).Grow(1).Shrink(1).Children(func() {
+			ui.Text(c, name).FontSize(small).SingleLine()
+			if dir != "" {
+				ui.Text(c, dir).FontSize(11).TextColor(p.ink3).SingleLine()
+			}
+		})
+		if !f.Binary {
+			if f.Added > 0 {
+				ui.Text(c, "+"+itoa(f.Added)).FontSize(11).TextColor(p.green)
+			}
+			if f.Deleted > 0 {
+				ui.Text(c, "−"+itoa(f.Deleted)).FontSize(11).TextColor(p.red)
+			}
+		}
+	})
+	if row.Hovered() && !on {
+		row.Background(p.hover)
+	}
+	if row.Clicked() {
+		st.chosen = f.Path
+	}
+}
+
+// diffLines are a diff's lines from its first hunk on, without git's header.
+func diffLines(diff string) []string {
+	lines := strings.Split(strings.TrimRight(diff, "\n"), "\n")
+	for i, l := range lines {
+		if strings.HasPrefix(l, "@@") {
+			return lines[i:]
+		}
+	}
+	return nil
+}
+
+func (a *App) diffView(c *ui.Context, p palette, key string, x hubapi.Session, f hubapi.GitFile) {
+	ds := a.readDiff(key, x, f)
+	ui.Row(c).Padding(10, 16).Gap(8).BorderWidth(0, 0, 1, 0).BorderColor(p.line).Children(func() {
+		ui.Text(c, f.Path).Font("monospace").FontSize(small).Bold().SingleLine().Grow(1).Shrink(1).Selectable()
+		if f.OrigPath != "" {
+			ui.Text(c, a.tr("changesRenamed", "path", f.OrigPath)).FontSize(11).TextColor(p.ink3).SingleLine()
+		}
+	})
+	switch {
+	case f.Binary:
+		a.empty(c, p, "read", a.tr("changesBinary"), "")
+		return
+	case ds.err != "":
+		a.empty(c, p, "warning", ds.err, "")
+		return
+	case !ds.loaded:
+		ui.Spinner(c).Margin(ui.Auto)
+		return
+	}
+	a.diffBody(c, p, "diff-"+key+"/"+f.Path, ds.diff.Diff, ds.diff.Truncated, false)
+}
+
+// diffBody draws a diff: one file's from its first hunk, or a commit's whole (whole) with a header per file.
+func (a *App) diffBody(c *ui.Context, p palette, id, diff string, truncated, whole bool) {
+	var lines []string
+	if whole {
+		lines = strings.Split(strings.TrimRight(diff, "\n"), "\n")
+	} else {
+		lines = diffLines(diff)
+	}
+	if len(lines) == 0 || len(lines) == 1 && lines[0] == "" {
+		a.empty(c, p, "read", a.tr("changesNoDiff"), "")
+		return
+	}
+	addBg, delBg := p.green.Alpha(0.12), p.red.Alpha(0.12)
+	ui.Scroll(c.Key(id)).Grow(1).Children(func() {
+		ui.Column(c).PaddingY(6).Children(func() {
+			for i, l := range lines {
+				if whole {
+					switch {
+					case strings.HasPrefix(l, "diff --git "):
+						path := l[len("diff --git "):]
+						if j := strings.Index(path, " b/"); j >= 0 {
+							path = path[j+3:]
+						}
+						ui.Row(c.Key("l"+itoa(i))).Padding(6, 16).Margin(8, 0, 2, 0).Background(p.inset).Children(func() {
+							ui.Text(c, path).Font("monospace").FontSize(small).Bold().Selectable()
+						})
+						continue
+					case strings.HasPrefix(l, "index "), strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "+++ "),
+						strings.HasPrefix(l, "new file mode"), strings.HasPrefix(l, "deleted file mode"), strings.HasPrefix(l, "similarity index"):
+						continue
+					}
+				}
+				row := ui.Row(c.Key("l"+itoa(i))).Padding(0, 16)
+				fg := p.ink
+				switch {
+				case strings.HasPrefix(l, "@@"):
+					row.Background(p.inset).Margin(4, 0)
+					fg = p.ink3
+				case strings.HasPrefix(l, "+"):
+					row.Background(addBg)
+				case strings.HasPrefix(l, "-"):
+					row.Background(delBg)
+				case strings.HasPrefix(l, `\`):
+					fg = p.ink3
+				}
+				row.Children(func() {
+					ui.Text(c, l).Font("monospace").FontSize(small).TextColor(fg).Selectable()
+				})
+			}
+			if truncated {
+				ui.Text(c, a.tr("changesTruncated")).FontSize(small).TextColor(p.ink3).Padding(8, 16)
+			}
+		})
+	})
+}
