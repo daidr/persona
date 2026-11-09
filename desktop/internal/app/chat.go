@@ -190,7 +190,7 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 		}
 		a.pageHeader(c, p, titleOf(x), sub, func() {
 			if known && x.Can("read") {
-				ui.Segmented(c.Key("pane-"+key), &st.pane, a.tr("paneChat"), a.tr("paneTerminal"), a.tr("paneChanges"))
+				ui.Segmented(c.Key("pane-"+key), &st.pane, a.tr("paneChat"), a.tr("paneTerminal"), a.tr("paneChanges"), a.tr("paneFiles"))
 			}
 			if known {
 				state := d.StateOf(x)
@@ -208,6 +208,9 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 			return
 		case paneChanges:
 			a.changesPane(c, p, key, x)
+			return
+		case paneFiles:
+			a.filesPane(c, p, key, x)
 			return
 		}
 	}

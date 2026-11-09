@@ -27,6 +27,7 @@ import (
 type fakeHost struct {
 	secrets  map[string]string
 	pick     []string
+	save     string
 	notes    []Notification
 	badge    int
 	opened   []string
@@ -61,38 +62,66 @@ func (h *fakeHost) PickFiles(_ string, done func([]string)) {
 	}
 }
 
-var mockURL string
+// mockURL is the repository's mock hub (scripts/mock/mock_hub.py); gitMockURL another one whose Git can be written to
+// (MOCK_GIT_WRITE), whose status tests would otherwise share.
+func (h *fakeHost) SaveFile(_, _ string, done func(string)) {
+	if h.save != "" {
+		done(h.save)
+	}
+}
 
-// TestMain starts the repository's mock hub (scripts/mock/mock_hub.py), which serves machines, agents, cards and
-// an Inbox shaped as a real hub's, when python3 is there.
+var mockURL, gitMockURL string
+
+// TestMain starts the mock hubs, which serve machines, agents, cards and an Inbox shaped as a real hub's, when
+// python3 is there.
 func TestMain(m *testing.M) {
+	var stop []func()
 	if py, err := exec.LookPath("python3"); err == nil {
-		l, err := net.Listen("tcp", "127.0.0.1:0")
-		if err == nil {
-			port := l.Addr().(*net.TCPAddr).Port
-			l.Close()
-			cmd := exec.Command(py, "../../../scripts/mock/mock_hub.py")
-			cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port), "MOCK_EXTENSIONS=1")
-			if cmd.Start() == nil {
-				defer cmd.Process.Kill()
-				url := fmt.Sprintf("http://127.0.0.1:%d", port)
-				for i := 0; i < 100; i++ {
-					if r, err := http.Get(url + "/api/v1/health"); err == nil {
-						r.Body.Close()
-						mockURL = url
-						break
-					}
-					time.Sleep(100 * time.Millisecond)
-				}
-			}
-		}
+		var kill func()
+		mockURL, kill = startMock(py, "MOCK_EXTENSIONS=1")
+		stop = append(stop, kill)
+		gitMockURL, kill = startMock(py, "MOCK_GIT_WRITE=1")
+		stop = append(stop, kill)
 	}
 	code := m.Run()
+	for _, kill := range stop {
+		kill()
+	}
 	os.Exit(code)
+}
+
+func startMock(py string, env ...string) (string, func()) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return "", func() {}
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	cmd := exec.Command(py, "../../../scripts/mock/mock_hub.py")
+	cmd.Env = append(append(os.Environ(), fmt.Sprintf("PORT=%d", port)), env...)
+	if cmd.Start() != nil {
+		return "", func() {}
+	}
+	kill := func() { _ = cmd.Process.Kill(); _ = cmd.Wait() }
+	url := fmt.Sprintf("http://127.0.0.1:%d", port)
+	for i := 0; i < 100; i++ {
+		if r, err := http.Get(url + "/api/v1/health"); err == nil {
+			r.Body.Close()
+			return url, kill
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	kill()
+	return "", func() {}
 }
 
 // signedIn is the app signed in to the mock hub with everything read, the socket left out.
 func signedIn(t *testing.T, lang string) (*App, *fakeHost) {
+	t.Helper()
+	return signedInTo(t, mockURL, lang)
+}
+
+func signedInTo(t *testing.T, mockURL, lang string) (*App, *fakeHost) {
 	t.Helper()
 	if mockURL == "" {
 		t.Skip("the mock hub needs python3")

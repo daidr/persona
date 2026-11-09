@@ -52,6 +52,9 @@ type Host interface {
 	// PickFiles asks for files with the system's dialog and gives their paths to done on the main thread; it doesn't
 	// call done when the user cancels.
 	PickFiles(title string, done func(paths []string))
+	// SaveFile asks where to save a file named name and gives the path to done on the main thread; it doesn't call
+	// done when the person cancels.
+	SaveFile(title, name string, done func(path string))
 }
 
 // App is the whole interface's state.
@@ -76,20 +79,21 @@ type App struct {
 	palette paletteState
 	chats   map[string]*chatState
 	// images are the chats' pictures, decoded, by item id.
-	images   map[string]ui.ImageSource
-	inbox    inboxPage
-	sets     settingsPage
-	routines routinesPage
-	act      agentAction
-	todos    todosPage
-	kb       kbPage
-	terms    map[string]*termState
-	gits     map[string]*changesState
-	cards    map[string]*cardState
-	persona  personaState
-	start    startForm
-	badge    int
-	toasts   []string
+	images    map[string]ui.ImageSource
+	inbox     inboxPage
+	sets      settingsPage
+	routines  routinesPage
+	act       agentAction
+	todos     todosPage
+	kb        kbPage
+	terms     map[string]*termState
+	gits      map[string]*changesState
+	fileViews map[string]*filesState
+	cards     map[string]*cardState
+	persona   personaState
+	start     startForm
+	badge     int
+	toasts    []string
 }
 
 // conn is the live connection to the hub shown.

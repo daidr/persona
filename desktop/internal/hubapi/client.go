@@ -44,6 +44,8 @@ type Error struct {
 	Status  int
 	Code    string `json:"code"`
 	Message string `json:"error"`
+	// Files are what a Git refusal is about (a conflict's files).
+	Files []string `json:"files,omitempty"`
 }
 
 func (e *Error) Error() string {

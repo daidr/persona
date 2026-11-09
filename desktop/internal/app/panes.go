@@ -15,6 +15,7 @@ const (
 	paneChat = iota
 	paneTerminal
 	paneChanges
+	paneFiles
 )
 
 // termState is an agent's terminal as last read, and what is being typed into it.
@@ -36,6 +37,7 @@ type changesState struct {
 	err     string
 	chosen  string
 	diffs   map[string]*diffState
+	git     gitState
 }
 
 type diffState struct {
@@ -199,10 +201,7 @@ func (a *App) readChanges(key string, x hubapi.Session) {
 				st.err = a.errorText(err)
 				return
 			}
-			st.status, st.loaded, st.diffs = gs, true, map[string]*diffState{}
-			if st.chosen == "" && len(gs.Files) > 0 {
-				st.chosen = gs.Files[0].Path
-			}
+			a.setGitStatus(st, gs)
 		})
 	})
 }
@@ -267,17 +266,20 @@ func (p palette) markColor(mark string) ui.Color {
 	return p.orange
 }
 
-// changesPane is what the agent changed in its folder: the files beside the chosen file's diff.
+// changesPane is the agent's folder's Git: its changes beside the chosen file's diff, or its history beside the chosen
+// commit; on a hub with git_write, staging, committing, pushing, branches, stashes and the branch's pull request too.
 func (a *App) changesPane(c *ui.Context, p palette, key string, x hubapi.Session) {
 	if x.Cwd == "" {
 		a.empty(c, p, "git", a.tr("changesNoFolder"), "")
 		return
 	}
 	st := a.changes(key)
+	g := &st.git
 	if !st.loaded && !st.loading && st.err == "" {
 		a.readChanges(key, x)
 	}
 	gs := st.status
+	writable := a.gitWritable() && gs.IsRepo
 	ui.Row(c).Padding(10, pagePad).Gap(10).BorderWidth(0, 0, 1, 0).BorderColor(p.line).Children(func() {
 		ui.Icon(c, icon("git")).TextColor(p.ink2)
 		ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {
@@ -299,15 +301,18 @@ func (a *App) changesPane(c *ui.Context, p palette, key string, x hubapi.Session
 				ui.Text(c, gs.Head.Short+" · "+gs.Head.Subject).FontSize(small).TextColor(p.ink2).SingleLine()
 			}
 		})
-		if st.loading {
+		if st.loading || g.busy != "" {
 			ui.Spinner(c)
+		}
+		if writable {
+			a.gitActions(c, p, key, x)
 		}
 		if ui.Button(c, a.tr("changesRefresh")).Disabled(st.loading).Clicked() {
 			a.readChanges(key, x)
 		}
 	})
 	switch {
-	case st.err != "":
+	case st.err != "" && !st.loaded:
 		a.empty(c, p, "warning", st.err, "")
 		return
 	case !st.loaded:
@@ -316,9 +321,9 @@ func (a *App) changesPane(c *ui.Context, p palette, key string, x hubapi.Session
 	case !gs.IsRepo:
 		a.empty(c, p, "git", a.tr("changesNotRepo"), x.Cwd)
 		return
-	case len(gs.Files) == 0:
-		a.empty(c, p, "check", a.tr("changesNone"), a.tr("changesNoneHint"))
-		return
+	}
+	if writable {
+		a.gitDialogs(c, p, key, x)
 	}
 	var chosen hubapi.GitFile
 	for _, f := range gs.Files {
@@ -327,25 +332,47 @@ func (a *App) changesPane(c *ui.Context, p palette, key string, x hubapi.Session
 		}
 	}
 	ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
-		ui.Scroll(c.Key("files-"+key)).Width(280).BorderWidth(0, 1, 0, 0).BorderColor(p.line).Children(func() {
-			ui.Column(c).Padding(6).Children(func() {
-				ui.Text(c, a.tr("changesFiles", "count", itoa(len(gs.Files)))).FontSize(11).Bold().TextColor(p.ink3).Padding(6, 8)
-				for _, f := range gs.Files {
-					a.fileRow(c, p, st, f)
-				}
+		ui.Column(c).Width(300).BorderWidth(0, 1, 0, 0).BorderColor(p.line).Children(func() {
+			ui.Segmented(c.Key("git-tab-"+key), &g.tab, a.tr("gitChanges", "count", itoa(len(gs.Files))), a.tr("gitHistory")).Margin(8, 8, 0, 8)
+			ui.Scroll(c.Key("files-" + key)).Grow(1).Children(func() {
+				ui.Column(c).Padding(6).Children(func() {
+					if writable {
+						a.prCard(c, p, key, x)
+					}
+					if g.tab == 1 {
+						a.historyList(c, p, key, x)
+						return
+					}
+					if len(gs.Files) == 0 {
+						ui.Text(c, a.tr("changesNone")).FontSize(small).TextColor(p.ink3).Padding(8)
+					}
+					for _, f := range gs.Files {
+						a.fileRow(c, p, key, x, st, f, writable)
+					}
+				})
 			})
+			if writable && g.tab == 0 && len(gs.Files) > 0 {
+				a.gitBar(c, p, key, x)
+			}
 		})
 		ui.Column(c).Grow(1).Shrink(1).Children(func() {
-			if chosen.Path == "" {
+			switch {
+			case g.tab == 1 && g.commit != "":
+				a.commitView(c, p, key, x, g.commit)
+			case g.tab == 1:
+				a.empty(c, p, "git", a.tr("gitPickCommit"), "")
+			case len(gs.Files) == 0:
+				a.empty(c, p, "check", a.tr("changesNone"), a.tr("changesNoneHint"))
+			case chosen.Path == "":
 				a.empty(c, p, "read", a.tr("changesPick"), "")
-				return
+			default:
+				a.diffView(c, p, key, x, chosen)
 			}
-			a.diffView(c, p, key, x, chosen)
 		})
 	})
 }
 
-func (a *App) fileRow(c *ui.Context, p palette, st *changesState, f hubapi.GitFile) {
+func (a *App) fileRow(c *ui.Context, p palette, key string, x hubapi.Session, st *changesState, f hubapi.GitFile, writable bool) {
 	on := f.Path == st.chosen
 	bg := ui.Transparent
 	if on {
@@ -357,6 +384,9 @@ func (a *App) fileRow(c *ui.Context, p palette, st *changesState, f hubapi.GitFi
 	}
 	row := ui.ButtonBase(c.Key("f-"+f.Path)).Padding(6, 8).Radius(rowRadius).Gap(8).Background(bg).Label(f.Path)
 	row.Children(func() {
+		if writable {
+			a.stageBox(c, key, x, f)
+		}
 		mark := fileMark(f)
 		ui.Text(c, mark).Font("monospace").FontSize(small).Bold().TextColor(p.markColor(mark)).Width(12)
 		ui.Column(c).Grow(1).Shrink(1).Children(func() {
@@ -412,15 +442,41 @@ func (a *App) diffView(c *ui.Context, p palette, key string, x hubapi.Session, f
 		ui.Spinner(c).Margin(ui.Auto)
 		return
 	}
-	lines := diffLines(ds.diff.Diff)
-	if len(lines) == 0 {
+	a.diffBody(c, p, "diff-"+key+"/"+f.Path, ds.diff.Diff, ds.diff.Truncated, false)
+}
+
+// diffBody draws a diff: one file's from its first hunk, or a commit's whole (whole) with a header per file.
+func (a *App) diffBody(c *ui.Context, p palette, id, diff string, truncated, whole bool) {
+	var lines []string
+	if whole {
+		lines = strings.Split(strings.TrimRight(diff, "\n"), "\n")
+	} else {
+		lines = diffLines(diff)
+	}
+	if len(lines) == 0 || len(lines) == 1 && lines[0] == "" {
 		a.empty(c, p, "read", a.tr("changesNoDiff"), "")
 		return
 	}
 	addBg, delBg := p.green.Alpha(0.12), p.red.Alpha(0.12)
-	ui.Scroll(c.Key("diff-" + key + "/" + f.Path)).Grow(1).Children(func() {
+	ui.Scroll(c.Key(id)).Grow(1).Children(func() {
 		ui.Column(c).PaddingY(6).Children(func() {
 			for i, l := range lines {
+				if whole {
+					switch {
+					case strings.HasPrefix(l, "diff --git "):
+						path := l[len("diff --git "):]
+						if j := strings.Index(path, " b/"); j >= 0 {
+							path = path[j+3:]
+						}
+						ui.Row(c.Key("l"+itoa(i))).Padding(6, 16).Margin(8, 0, 2, 0).Background(p.inset).Children(func() {
+							ui.Text(c, path).Font("monospace").FontSize(small).Bold().Selectable()
+						})
+						continue
+					case strings.HasPrefix(l, "index "), strings.HasPrefix(l, "--- "), strings.HasPrefix(l, "+++ "),
+						strings.HasPrefix(l, "new file mode"), strings.HasPrefix(l, "deleted file mode"), strings.HasPrefix(l, "similarity index"):
+						continue
+					}
+				}
 				row := ui.Row(c.Key("l"+itoa(i))).Padding(0, 16)
 				fg := p.ink
 				switch {
@@ -438,7 +494,7 @@ func (a *App) diffView(c *ui.Context, p palette, key string, x hubapi.Session, f
 					ui.Text(c, l).Font("monospace").FontSize(small).TextColor(fg).Selectable()
 				})
 			}
-			if ds.diff.Truncated {
+			if truncated {
 				ui.Text(c, a.tr("changesTruncated")).FontSize(small).TextColor(p.ink3).Padding(8, 16)
 			}
 		})

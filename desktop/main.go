@@ -248,6 +248,18 @@ func (d *desktop) PickFiles(title string, done func([]string)) {
 	}()
 }
 
+func (d *desktop) SaveFile(title, name string, done func(string)) {
+	go func() {
+		dest, err := mygo.Dialog.Save(mygo.SaveDialogOptions{Parent: d.win, Title: title, DefaultPath: name, CreateDirectories: true})
+		if err != nil {
+			log.Println("save dialog:", err)
+		}
+		if dest != "" {
+			d.Post(func() { done(dest) })
+		}
+	}()
+}
+
 func (d *desktop) Focused() bool {
 	return d.win != nil && !d.win.IsDestroyed() && d.win.IsVisible() && d.win.IsFocused()
 }
