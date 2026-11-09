@@ -39,6 +39,7 @@ type Notify struct {
 type Effect struct {
 	Inbox     bool
 	Assistant bool
+	Todos     bool
 	Notify    *Notify
 }
 
@@ -52,6 +53,8 @@ type Store struct {
 	Assistant    hubapi.Assistant
 	Inbox        []hubapi.InboxItem
 	InboxLoaded  bool
+	Todos        []hubapi.Todo
+	TodosLoaded  bool
 }
 
 // New is an empty store.
@@ -69,7 +72,7 @@ func (s *Store) Apply(ev hubapi.Event) Effect {
 	switch ev.Type {
 	case "hello":
 		_ = ev.Decode(&s.Hello)
-		fx.Inbox, fx.Assistant = true, true
+		fx.Inbox, fx.Assistant, fx.Todos = true, true, true
 	case "machines":
 		var m struct {
 			Machines []hubapi.Machine `json:"machines"`
@@ -143,6 +146,8 @@ func (s *Store) Apply(ev hubapi.Event) Effect {
 		}
 	case "inbox":
 		fx.Inbox = true
+	case "todos":
+		fx.Todos = true
 	}
 	return fx
 }
@@ -203,6 +208,18 @@ func (s *Store) SetSessions(machine string, list []hubapi.Session) {
 		}
 	}
 	s.Sessions[machine] = mine
+}
+
+// PutSession adds an agent or replaces it, until its computer's next list.
+func (s *Store) PutSession(x hubapi.Session) {
+	list := s.Sessions[x.MachineID]
+	for i := range list {
+		if list[i].SessionID == x.SessionID {
+			list[i] = x
+			return
+		}
+	}
+	s.Sessions[x.MachineID] = append(list, x)
 }
 
 // SetInteractions replaces the open cards.
@@ -424,4 +441,47 @@ func (s *Store) MainConversation() (hubapi.Session, bool) {
 		return hubapi.Session{MachineID: a.MachineID, SessionID: a.Main, Assistant: true}, true
 	}
 	return hubapi.Session{}, false
+}
+
+// SetTodos replaces the to-dos.
+func (s *Store) SetTodos(list []hubapi.Todo) {
+	s.Todos = list
+	s.TodosLoaded = true
+}
+
+// PutTodo adds a to-do or replaces the one with its id, until the next read.
+func (s *Store) PutTodo(t hubapi.Todo) {
+	for i := range s.Todos {
+		if s.Todos[i].ID == t.ID {
+			s.Todos[i] = t
+			return
+		}
+	}
+	s.Todos = append([]hubapi.Todo{t}, s.Todos...)
+}
+
+// DropTodo removes a to-do until the next read.
+func (s *Store) DropTodo(id string) {
+	s.Todos = slices.DeleteFunc(s.Todos, func(t hubapi.Todo) bool { return t.ID == id })
+}
+
+// Todo finds a to-do.
+func (s *Store) Todo(id string) (hubapi.Todo, bool) {
+	for _, t := range s.Todos {
+		if t.ID == id {
+			return t, true
+		}
+	}
+	return hubapi.Todo{}, false
+}
+
+// TodosOpen counts the to-dos not done.
+func (s *Store) TodosOpen() int {
+	n := 0
+	for _, t := range s.Todos {
+		if !t.Done() {
+			n++
+		}
+	}
+	return n
 }

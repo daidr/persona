@@ -304,3 +304,83 @@ func parseTime(s string) time.Time {
 
 // ParseTime reads the hub's RFC 3339 times, or the zero time.
 func ParseTime(s string) time.Time { return parseTime(s) }
+
+// TodoAgent is an agent working on a to-do, with what the hub remembered of it.
+type TodoAgent struct {
+	MachineID  string `json:"machine_id"`
+	SessionID  string `json:"session_id"`
+	Title      string `json:"title,omitempty"`
+	Cwd        string `json:"cwd,omitempty"`
+	Agent      string `json:"agent,omitempty"`
+	StartError string `json:"start_error,omitempty"`
+	ReleasedAt string `json:"released_at,omitempty"`
+}
+
+// Key identifies the agent's session.
+func (a TodoAgent) Key() string { return a.MachineID + "/" + a.SessionID }
+
+// Todo is a to-do and the agents on it (docs/assistant/todos.md).
+type Todo struct {
+	ID        string      `json:"id"`
+	Title     string      `json:"title"`
+	Notes     string      `json:"notes,omitempty"`
+	DueAt     string      `json:"due_at,omitempty"`
+	DueDate   string      `json:"due_date,omitempty"`
+	Stage     string      `json:"stage,omitempty"`
+	PRURL     string      `json:"pr_url,omitempty"`
+	DoneAt    string      `json:"done_at,omitempty"`
+	DoneBy    string      `json:"done_by,omitempty"`
+	CreatedAt string      `json:"created_at,omitempty"`
+	UpdatedAt string      `json:"updated_at,omitempty"`
+	Agents    []TodoAgent `json:"agents,omitempty"`
+	Ask       *struct {
+		Verdict   string `json:"verdict,omitempty"`
+		Recommend string `json:"recommend,omitempty"`
+	} `json:"ask,omitempty"`
+}
+
+// Done tells a finished to-do.
+func (t Todo) Done() bool { return t.DoneAt != "" }
+
+// Launcher is a way to start an agent on a computer: a CLI with its settings (docs/integrations/launchers.md).
+type Launcher struct {
+	Name      string `json:"name"`
+	Label     string `json:"label,omitempty"`
+	Model     string `json:"model,omitempty"`
+	Agent     string `json:"agent,omitempty"`
+	AgentType string `json:"agent_type,omitempty"`
+}
+
+// Launchers are a computer's launchers and the one new agents use by default.
+type Launchers struct {
+	Launchers []Launcher `json:"launchers"`
+	Default   *struct {
+		Provider string `json:"provider,omitempty"`
+		Model    string `json:"model,omitempty"`
+	} `json:"default,omitempty"`
+}
+
+// Dir is a folder on a computer.
+type Dir struct {
+	Name  string `json:"name"`
+	Path  string `json:"path"`
+	IsGit bool   `json:"is_git,omitempty"`
+}
+
+// Dirs is a folder's subfolders and the folders agents started in lately.
+type Dirs struct {
+	Path    string `json:"path"`
+	Parent  string `json:"parent,omitempty"`
+	Entries []Dir  `json:"entries"`
+	Recent  []Dir  `json:"recent,omitempty"`
+}
+
+// StartRequest starts an agent (POST /api/v1/sessions).
+type StartRequest struct {
+	MachineID string `json:"machine_id"`
+	Cwd       string `json:"cwd"`
+	Launcher  string `json:"launcher,omitempty"`
+	AgentType string `json:"agent_type,omitempty"`
+	Prompt    string `json:"prompt,omitempty"`
+	TodoID    string `json:"todo_id,omitempty"`
+}

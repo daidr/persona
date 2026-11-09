@@ -300,3 +300,61 @@ func Offline(err error) bool {
 	var e *Error
 	return errors.As(err, &ne) || errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &e) && e.Status >= 502)
 }
+
+// Todos lists the to-dos.
+func (c *Client) Todos(ctx context.Context) ([]Todo, error) {
+	var out struct {
+		Todos []Todo `json:"todos"`
+	}
+	err := c.Do(ctx, http.MethodGet, "/todos", nil, &out)
+	return out.Todos, err
+}
+
+// CreateTodo adds a to-do.
+func (c *Client) CreateTodo(ctx context.Context, title, notes string) (Todo, error) {
+	var out struct {
+		Todo Todo `json:"todo"`
+	}
+	err := c.Do(ctx, http.MethodPost, "/todos", map[string]string{"title": title, "notes": notes}, &out)
+	return out.Todo, err
+}
+
+// UpdateTodo changes a to-do's title, notes or done ("title", "notes", "done").
+func (c *Client) UpdateTodo(ctx context.Context, id string, patch map[string]any) (Todo, error) {
+	var out struct {
+		Todo Todo `json:"todo"`
+	}
+	err := c.Do(ctx, http.MethodPatch, "/todos/"+url.PathEscape(id), patch, &out)
+	return out.Todo, err
+}
+
+// DeleteTodo deletes a to-do and its links; the agents stay.
+func (c *Client) DeleteTodo(ctx context.Context, id string) error {
+	return c.Do(ctx, http.MethodDelete, "/todos/"+url.PathEscape(id), nil, nil)
+}
+
+// Launchers lists how agents start on a computer.
+func (c *Client) Launchers(ctx context.Context, machine string) (Launchers, error) {
+	var out Launchers
+	err := c.Do(ctx, http.MethodGet, "/machines/"+url.PathEscape(machine)+"/launchers", nil, &out)
+	return out, err
+}
+
+// Dirs lists a folder on a computer; "" is the home folder.
+func (c *Client) Dirs(ctx context.Context, machine, path string) (Dirs, error) {
+	var out Dirs
+	err := c.Do(ctx, http.MethodGet, "/machines/"+url.PathEscape(machine)+"/dirs?path="+url.QueryEscape(path), nil, &out)
+	return out, err
+}
+
+// Start starts an agent.
+func (c *Client) Start(ctx context.Context, req StartRequest) (Session, error) {
+	var out struct {
+		Session Session `json:"session"`
+	}
+	err := c.Do(ctx, http.MethodPost, "/sessions", req, &out)
+	if out.Session.MachineID == "" {
+		out.Session.MachineID = req.MachineID
+	}
+	return out.Session, err
+}

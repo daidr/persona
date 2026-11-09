@@ -56,7 +56,10 @@ func (a *App) agentsList(c *ui.Context, p palette, open string) {
 	g := &a.agents
 	d := a.conn.data
 	ui.Row(c).Padding(16, 16, 8, 16).Children(func() {
-		ui.Text(c, a.tr("goAgents")).FontSize(title).Bold()
+		ui.Text(c, a.tr("goAgents")).FontSize(title).Bold().Grow(1)
+		if ui.Button(c, "").Label(a.tr("startTitle")).Tooltip(a.tr("startTitle")).Children(func() { ui.Icon(c, icon("plus")) }).Clicked() {
+			a.openStart("", "")
+		}
 	})
 	ui.SearchField(c.Key("agents-search"), &g.query).Placeholder(a.tr("agentsSearch")).Margin(0, 16, 8, 16)
 	g.rows = g.rows[:0]

@@ -71,6 +71,8 @@ type App struct {
 	chats   map[string]*chatState
 	inbox   inboxPage
 	sets    settingsPage
+	todos   todosPage
+	start   startForm
 	badge   int
 	toasts  []string
 }
@@ -320,6 +322,7 @@ func (a *App) refresh(c *conn) {
 		ixs, _ := c.client.Interactions(ctx)
 		as, _ := c.client.Assistant(ctx)
 		inbox, inboxErr := c.client.Inbox(ctx)
+		todos, todosErr := c.client.Todos(ctx)
 		a.Host.Post(func() {
 			if !a.live(c) {
 				return
@@ -332,6 +335,9 @@ func (a *App) refresh(c *conn) {
 			c.data.Assistant = as
 			if inboxErr == nil {
 				c.data.SetInbox(inbox)
+			}
+			if todosErr == nil {
+				c.data.SetTodos(todos)
 			}
 			c.loaded, c.err = true, ""
 			a.updateBadge()
@@ -361,6 +367,22 @@ func (a *App) refreshInbox(c *conn) {
 		a.Host.Post(func() {
 			if a.live(c) {
 				c.data.SetInbox(list)
+			}
+		})
+	})
+}
+
+func (a *App) refreshTodos(c *conn) {
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		list, err := c.client.Todos(ctx)
+		if err != nil {
+			return
+		}
+		a.Host.Post(func() {
+			if a.live(c) {
+				c.data.SetTodos(list)
 			}
 		})
 	})
@@ -402,6 +424,9 @@ func (a *App) apply(c *conn, ev hubapi.Event) {
 	}
 	if fx.Assistant && ev.Type != "hello" {
 		a.refreshAssistant(c)
+	}
+	if fx.Todos && ev.Type != "hello" {
+		a.refreshTodos(c)
 	}
 	if fx.Notify != nil {
 		a.notify(c, *fx.Notify)

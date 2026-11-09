@@ -102,3 +102,27 @@ func TestInbox(t *testing.T) {
 		t.Fatal("mark")
 	}
 }
+
+func TestTodos(t *testing.T) {
+	s := New()
+	if fx := s.Apply(ev("todos", `{"type":"todos"}`)); !fx.Todos {
+		t.Fatal("todos hint")
+	}
+	s.SetTodos([]hubapi.Todo{{ID: "a", Title: "A"}, {ID: "b", DoneAt: "x"}})
+	s.PutTodo(hubapi.Todo{ID: "c", Title: "C"})
+	s.PutTodo(hubapi.Todo{ID: "a", Title: "A2"})
+	if s.TodosOpen() != 2 || s.Todos[0].ID != "c" {
+		t.Fatalf("%+v", s.Todos)
+	}
+	if x, ok := s.Todo("a"); !ok || x.Title != "A2" {
+		t.Fatal("put replaces")
+	}
+	s.PutSession(hubapi.Session{MachineID: "m", SessionID: "new", Title: "N"})
+	if x, ok := s.Session("m/new"); !ok || x.Title != "N" {
+		t.Fatal("put session")
+	}
+	s.DropTodo("c")
+	if _, ok := s.Todo("c"); ok {
+		t.Fatal("drop")
+	}
+}

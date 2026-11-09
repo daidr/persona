@@ -26,8 +26,9 @@ func shortcutLabel() string {
 var pages = []struct{ key, path, accel string }{
 	{"goPersona", "/", "CmdOrCtrl+1"},
 	{"goAgents", "/agents", "CmdOrCtrl+2"},
-	{"goInbox", "/inbox", "CmdOrCtrl+3"},
-	{"goMachines", "/machines", "CmdOrCtrl+4"},
+	{"goTodos", "/todos", "CmdOrCtrl+3"},
+	{"goInbox", "/inbox", "CmdOrCtrl+4"},
+	{"goMachines", "/machines", "CmdOrCtrl+5"},
 }
 
 // refreshMenus sets the app menu and the tray menu again, after the hubs, the badge or a setting changed.

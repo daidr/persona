@@ -38,6 +38,12 @@ func (a *App) View(c *ui.Context) {
 				case r.Match("/inbox/{id...}"):
 					r.Title(a.tr("goInbox"))
 					a.inboxView(c, p, r.Param("id"))
+				case r.Match("/todos"):
+					r.Title(a.tr("goTodos"))
+					a.todosView(c, p, "")
+				case r.Match("/todos/{id...}"):
+					r.Title(a.tr("goTodos"))
+					a.todosView(c, p, r.Param("id"))
 				case r.Match("/machines"):
 					r.Title(a.tr("goMachines"))
 					a.machinesView(c, p)
@@ -50,11 +56,12 @@ func (a *App) View(c *ui.Context) {
 			})
 		})
 	})
+	a.startView(c, p)
 }
 
 // section is the sidebar item a path belongs to.
 func section(path string) string {
-	for _, s := range []string{"/agents", "/inbox", "/machines", "/settings"} {
+	for _, s := range []string{"/agents", "/todos", "/inbox", "/machines", "/settings"} {
 		if path == s || len(path) > len(s) && path[:len(s)+1] == s+"/" {
 			return s
 		}
@@ -75,6 +82,11 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 			ui.SidebarItem(c, "/agents", icon("agent"), a.tr("goAgents")).Children(func() {
 				if n := d.NeedsYou(); n > 0 {
 					ui.Badge(c, itoa(n))
+				}
+			})
+			ui.SidebarItem(c, "/todos", icon("todo"), a.tr("goTodos")).Children(func() {
+				if n := d.TodosOpen(); n > 0 {
+					ui.Badge(c, itoa(n)).Background(p.hover).TextColor(p.ink2)
 				}
 			})
 			ui.SidebarItem(c, "/inbox", icon("inbox"), a.tr("goInbox")).Children(func() {

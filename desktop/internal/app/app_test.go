@@ -329,3 +329,106 @@ func TestNotify(t *testing.T) {
 		t.Fatal("notified with notifications off")
 	}
 }
+
+func TestTodosAndStart(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	d := a.conn.data
+	if !d.TodosLoaded || len(d.Todos) == 0 {
+		t.Fatal("to-dos not read")
+	}
+	a.Navigate("/todos")
+	tt := ui.NewTester(a.View, 1280, 800)
+	tt.Frame()
+	if !tt.HasText(a.tr("todosOpen")) {
+		t.Fatalf("to-dos: %q", tt.Texts())
+	}
+	// a new to-do opens once the hub has it
+	a.todos.draft = "Write the release notes"
+	a.addTodo()
+	tt.Frame()
+	if a.Path() == "/todos" || !tt.HasText("Write the release notes") {
+		t.Fatalf("new to-do at %s: %q", a.Path(), tt.Texts())
+	}
+	id := a.Path()[len("/todos/"):]
+	if err := tt.Click(a.tr("todoMarkDone")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if x, ok := d.Todo(id); !ok || !x.Done() {
+		t.Fatalf("not done: %+v", x)
+	}
+	if err := tt.Click(a.tr("reopen")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+
+	// a to-do an agent worked on
+	var linked hubapi.Todo
+	for _, x := range d.Todos {
+		if len(x.Agents) > 0 && !x.Done() {
+			linked = x
+			break
+		}
+	}
+	if linked.ID != "" {
+		a.Navigate("/todos/" + linked.ID)
+		tt.Frame()
+		shot(t, tt, "todo-light")
+		tt.SetDark(true)
+		shot(t, tt, "todo-dark")
+		tt.SetDark(false)
+	}
+
+	// New agent for the to-do: a computer, a folder from its list, Start
+	a.Navigate("/todos/" + id)
+	tt.Frame()
+	if err := tt.Click(a.tr("startAgent")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	f := &a.start
+	if !f.open || f.machine == "" || f.cwd == "" || len(f.launchers) == 0 || f.launcher == "" {
+		t.Fatalf("start form: %+v", f)
+	}
+	if !tt.HasText(a.tr("startForTodo", "title", "Write the release notes")) {
+		t.Fatalf("dialog: %q", tt.Texts())
+	}
+	if len(f.dirs.Entries) > 0 {
+		before := f.cwd
+		a.loadStart(f.machine, f.dirs.Entries[0].Path)
+		tt.Frame()
+		if f.cwd == before {
+			t.Fatal("folder not opened")
+		}
+	}
+	shot(t, tt, "start-light")
+	tt.SetDark(true)
+	shot(t, tt, "start-dark")
+	tt.SetDark(false)
+	if err := tt.Click(a.tr("startGo")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if f.open || f.err != "" || len(a.Path()) <= len("/agents/") || a.Path()[:8] != "/agents/" {
+		t.Fatalf("after start at %s: %+v", a.Path(), f)
+	}
+	if _, ok := d.Session(a.Path()[len("/agents/"):]); !ok {
+		t.Fatal("started agent not in the list")
+	}
+
+	// Delete asks first
+	a.Navigate("/todos/" + id)
+	tt.Frame()
+	if err := tt.Click(a.tr("todoDelete")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if !a.todos.deleting {
+		t.Fatal("no confirmation")
+	}
+	a.deleteTodo(id)
+	tt.Frame()
+	if _, ok := d.Todo(id); ok || a.Path() != "/todos" {
+		t.Fatalf("not deleted, at %s", a.Path())
+	}
+}
