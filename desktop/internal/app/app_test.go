@@ -72,7 +72,7 @@ func TestMain(m *testing.M) {
 			port := l.Addr().(*net.TCPAddr).Port
 			l.Close()
 			cmd := exec.Command(py, "../../../scripts/mock/mock_hub.py")
-			cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port))
+			cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", port), "MOCK_EXTENSIONS=1")
 			if cmd.Start() == nil {
 				defer cmd.Process.Kill()
 				url := fmt.Sprintf("http://127.0.0.1:%d", port)
@@ -975,5 +975,120 @@ func TestMatchCommands(t *testing.T) {
 	}
 	if got := matchCommands(all, " "); len(got) != 3 {
 		t.Fatalf("empty: %+v", got)
+	}
+}
+
+func TestHubSettings(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	a.Navigate("/settings")
+	tt := ui.NewTester(a.View, 1280, 900)
+	tt.Frame()
+	click := func(label string) {
+		t.Helper()
+		if err := tt.Click(label); err != nil {
+			t.Fatalf("%s: %v (%v)", label, err, tt.Texts())
+		}
+		tt.Frame()
+		tt.Frame()
+	}
+
+	// Devices: the list, revoking one after asking, a pairing link with its QR code
+	click(a.tr("settingsDevices"))
+	g := &a.sets
+	if !g.devices.done || len(g.tokens) == 0 || !tt.HasText(a.tr("deviceThis")) {
+		t.Fatalf("devices: %+v", g.devices)
+	}
+	shot(t, tt, "settings-devices-light")
+	tt.SetDark(true)
+	shot(t, tt, "settings-devices-dark")
+	tt.SetDark(false)
+	victim := ""
+	for _, tok := range g.tokens {
+		if tok.RevokedAt == "" && tok.ID != g.current {
+			victim = tok.ID
+			break
+		}
+	}
+	g.revoking = victim
+	// other tests' sign-ins pile up on the mock: room for all of them
+	tt.SetSize(1280, 2400)
+	tt.Frame()
+	click(a.tr("deviceRevokeConfirm"))
+	tt.SetSize(1280, 900)
+	for _, tok := range g.tokens {
+		if tok.ID == victim && tok.RevokedAt == "" {
+			t.Fatalf("%s not revoked: %+v", victim, g.tokens)
+		}
+	}
+	click(a.tr("devicesAdd"))
+	if g.pair == nil || g.pairQR == nil || !strings.HasPrefix(g.pair.PairURL, "persona://pair") {
+		t.Fatalf("pairing: %+v %q", g.pair, g.pairErr)
+	}
+	shot(t, tt, "settings-pair")
+	click(a.tr("pairCopy"))
+	if tt.Clipboard() != g.pair.PairURL {
+		t.Fatalf("clipboard: %q", tt.Clipboard())
+	}
+	click(a.tr("pairDoneButton"))
+	if g.pairOpen {
+		t.Fatal("the pairing dialog stayed open")
+	}
+
+	// Extensions: switching one off
+	click(a.tr("settingsExtensions"))
+	if !g.extensions.done || len(g.exts) == 0 {
+		t.Fatalf("extensions: %+v", g.extensions)
+	}
+	shot(t, tt, "settings-extensions-light")
+	var on hubapi.Extension
+	for _, x := range g.exts {
+		if x.On() && x.Status == "running" {
+			on = x
+			break
+		}
+	}
+	if err := tt.Click(a.tr("extSwitch", "name", on.Name)); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	for _, x := range g.exts {
+		if x.ID == on.ID && x.On() {
+			t.Fatalf("%s still on", x.ID)
+		}
+	}
+
+	// Connectors
+	click(a.tr("settingsConnectors"))
+	if !g.connectors.done || len(g.conns) == 0 {
+		t.Fatalf("connectors: %+v", g.connectors)
+	}
+	shot(t, tt, "settings-connectors-light")
+
+	// Models: a category's provider changed and back to Default
+	click(a.tr("settingsModels"))
+	if !g.models.done || len(g.modelCfg.Purposes) == 0 {
+		t.Fatalf("models: %+v", g.models)
+	}
+	tt.SetDark(true)
+	shot(t, tt, "settings-models-dark")
+	tt.SetDark(false)
+	var m hubapi.ModelPurpose
+	for _, x := range g.modelCfg.Purposes {
+		if x.Editable() && len(x.ProviderIDs) > 0 {
+			m = x
+			break
+		}
+	}
+	g.modelEdit, g.modelProv, g.modelName = m.ID, a.providerName(m.ProviderIDs[0]), "custom-model"
+	tt.Frame()
+	click(a.tr("save"))
+	for _, x := range g.modelCfg.Purposes {
+		if x.ID == m.ID && x.Override.Provider != m.ProviderIDs[0] {
+			t.Fatalf("%s: %+v", x.ID, x.Override)
+		}
+	}
+	if g.modelEdit != "" {
+		t.Fatal("the editor stayed open")
 	}
 }
