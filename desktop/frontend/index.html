@@ -1,0 +1,56 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Persona</title>
+  <link rel="stylesheet" href="connect.css">
+</head>
+<body>
+  <main class="page">
+    <header class="brand">
+      <img src="icon.png" alt="" width="56" height="56">
+      <div>
+        <h1 data-t="connectTitle"></h1>
+        <p class="muted" data-t="connectSubtitle"></p>
+      </div>
+    </header>
+
+    <section id="offline" class="card notice" hidden>
+      <h2 id="offline-title"></h2>
+      <p class="muted" data-t="offlineBody"></p>
+      <p id="offline-detail" class="detail"></p>
+      <div class="row-actions">
+        <button id="offline-retry" class="primary" data-t="offlineRetry"></button>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2 data-t="hubsHeading"></h2>
+      <p id="hubs-empty" class="muted" data-t="hubsEmpty" hidden></p>
+      <ul id="hubs" class="hubs"></ul>
+    </section>
+
+    <section class="card">
+      <h2 data-t="addHeading"></h2>
+      <form id="add" class="add" autocomplete="off">
+        <input id="add-input" type="text" spellcheck="false" data-ph="addPlaceholder">
+        <input id="add-label" type="text" data-ph="addLabelPlaceholder">
+        <button id="add-submit" class="primary" type="submit" data-t="addButton"></button>
+      </form>
+      <p id="add-error" class="error" role="alert" hidden></p>
+      <p class="muted small" data-t="addHint"></p>
+    </section>
+
+    <section class="card">
+      <h2 data-t="appHeading"></h2>
+      <label class="toggle"><input id="login" type="checkbox"> <span data-t="settingOpenAtLogin"></span></label>
+      <label class="toggle"><input id="shortcut" type="checkbox"> <span id="shortcut-label"></span></label>
+    </section>
+
+    <footer class="muted small" id="version"></footer>
+  </main>
+  <script src="connect.js"></script>
+</body>
+</html>

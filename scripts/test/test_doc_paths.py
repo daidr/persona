@@ -25,7 +25,7 @@ from unittest.mock import patch
 ROOT = Path(__file__).resolve().parents[2]
 
 # Top-level directories whose paths docs quote. Paths under scripts/ are often written relative to it (deploy/deploy.sh).
-TOP = ("android", "apple", "deploy", "docs", "integrations", "schema", "scripts", "sdk", "server", "site", "spec", "web",
+TOP = ("android", "apple", "deploy", "desktop", "docs", "integrations", "schema", "scripts", "sdk", "server", "site", "spec", "web",
        "prototypes")
 
 # Module directories whose tracked Markdown (READMEs, integration notes) is checked along with the top-level docs.

@@ -1,0 +1,21 @@
+{
+  "name": "Persona",
+  "slug": "persona-desktop",
+  "identifier": "dev.persona.desktop",
+  "version": "0.1.0",
+  "license": "MIT",
+  "urlSchemes": ["persona"],
+  "macos": {
+    "minimumSystemVersion": "12.0",
+    "infoPlist": {
+      "NSMicrophoneUsageDescription": "Persona uses the microphone when you talk to the assistant or dictate a message.",
+      "NSCameraUsageDescription": "Persona uses the camera when you take a photo to send to an agent.",
+      "NSAppTransportSecurity": { "NSAllowsArbitraryLoadsInWebContent": true }
+    }
+  },
+  "linux": {
+    "comment": "Your self-hosted personal SuperAgent",
+    "categories": ["Utility", "Development"],
+    "command": ["persona-desktop"]
+  }
+}

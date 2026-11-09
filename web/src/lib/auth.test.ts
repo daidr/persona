@@ -90,6 +90,10 @@ describe("deviceName", () => {
     expect(name).toContain("Chrome · Mac");
     expect(name).toMatch(/6/);
   });
+  it("names the desktop app as itself", () => {
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) PersonaDesktop/0.1.0" });
+    expect(deviceName(new Date(2026, 10, 6))).toContain("Persona Desktop · Mac");
+  });
 });
 
 describe("takeToken", () => {

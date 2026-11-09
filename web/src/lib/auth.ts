@@ -4,7 +4,8 @@ import { formatDate, t } from "../i18n";
 
 function browserName() {
   const ua = navigator.userAgent;
-  const b = /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : t("lib-auth.browser");
+  // The desktop app (desktop/, a system webview that says PersonaDesktop/<version>) is named as itself, not as its engine.
+  const b = /PersonaDesktop\//.test(ua) ? "Persona Desktop" : /Edg\//.test(ua) ? "Edge" : /Chrome\//.test(ua) ? "Chrome" : /Firefox\//.test(ua) ? "Firefox" : /Safari\//.test(ua) ? "Safari" : t("lib-auth.browser");
   const os = /Mac OS X/.test(ua) ? "Mac" : /Windows/.test(ua) ? "Windows" : /Linux/.test(ua) ? "Linux" : "";
   return [b, os].filter(Boolean).join(" · ");
 }

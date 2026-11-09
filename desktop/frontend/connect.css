@@ -1,0 +1,91 @@
+/* The connect page's tokens follow the web app's (web/src/styles.css), so the app looks the same before and after a
+   hub opens. */
+:root {
+  --page: #fafafb;
+  --surface: #fff;
+  --hover: #f4f5f6;
+  --ink: #1f2124;
+  --ink-2: #62656b;
+  --line: #ecedef;
+  --line-strong: #e0e2e5;
+  --field: #f2f2f3;
+  --accent: #0285ff;
+  --accent-ink: #0166cc;
+  --on-accent: #fff;
+  --green: #107638;
+  --red: #bd3038;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --radius: 10px;
+  --radius-sm: 7px;
+  --text: 14px;
+  --text-small: 12.5px;
+  --text-title: 22px;
+  --text-heading: 15px;
+  --control: 34px;
+  --font-sans: Inter, -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #17181a;
+    --surface: #232427;
+    --hover: #2a2b2e;
+    --ink: #f2f3f4;
+    --ink-2: #a5a8ad;
+    --line: #2e3033;
+    --line-strong: #3a3c40;
+    --field: #2b2c2f;
+    --accent: #3d9aff;
+    --accent-ink: #7ec0ff;
+    --on-accent: #fff;
+    --green: #6dd697;
+    --red: #ff9499;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--page); color: var(--ink); font: var(--text)/1.5 var(--font-sans); }
+.page { max-width: 640px; margin: 0 auto; padding: calc(var(--space-6) * 2) var(--space-6); display: grid; gap: var(--space-4); }
+.brand { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-2); }
+.brand img { border-radius: 14px; }
+h1 { font-size: var(--text-title); margin: 0; font-weight: 650; letter-spacing: -0.01em; }
+h2 { font-size: var(--text-heading); margin: 0 0 var(--space-3); font-weight: 600; }
+p { margin: 0; }
+.muted { color: var(--ink-2); }
+.small { font-size: var(--text-small); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-4); }
+.notice { border-color: var(--red); }
+.detail { font-family: var(--font-mono); font-size: var(--text-small); color: var(--ink-2); margin-top: var(--space-2); word-break: break-word; }
+.error { color: var(--red); margin-top: var(--space-2); }
+.row-actions { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+
+button, input { font: inherit; color: inherit; }
+button { height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--surface); cursor: pointer; white-space: nowrap; }
+button:hover { background: var(--hover); }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+button.primary:hover { filter: brightness(1.06); }
+button.link { border: 0; background: none; color: var(--accent-ink); padding: 0 var(--space-2); height: auto; }
+button.danger { color: var(--red); }
+input[type="text"] { height: var(--control); padding: 0 var(--space-3); border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--field); min-width: 0; }
+input[type="text"]:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+
+.add { display: grid; grid-template-columns: 1fr 160px auto; gap: var(--space-2); margin-bottom: var(--space-2); }
+@media (max-width: 560px) { .add { grid-template-columns: 1fr; } }
+
+.hubs { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+.hub { display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); }
+.hub:hover { background: var(--hover); }
+.hub .open { flex: 1; min-width: 0; text-align: left; border: 0; background: none; height: auto; padding: 0; display: grid; }
+.hub .name { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hub .addr { color: var(--ink-2); font-size: var(--text-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chip { font-size: var(--text-small); padding: 0 var(--space-2); border-radius: 999px; border: 1px solid var(--line-strong); color: var(--ink-2); white-space: nowrap; }
+.chip.current { color: var(--green); border-color: var(--green); }
+.hub input { flex: 1; }
+
+.toggle { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-1) 0; cursor: pointer; }
+.toggle input { width: 16px; height: 16px; accent-color: var(--accent); }
+footer { text-align: center; }

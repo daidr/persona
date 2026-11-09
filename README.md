@@ -58,7 +58,7 @@ You run a small hub on an always-on machine; your devices talk only to it, and i
 
 ## Docs
 
-[Getting started](docs/operations/getting-started.md) · [Architecture](docs/server/architecture.md) · [Protocol](docs/protocol/protocol.md) · [Docker](docs/operations/docker.md) · [iOS](docs/apple/ios.md) · [Mac](docs/apple/mac.md) · [Android](docs/android/android.md) · [Web](docs/web/web.md) · [All docs](CLAUDE.md#docs-index)
+[Getting started](docs/operations/getting-started.md) · [Architecture](docs/server/architecture.md) · [Protocol](docs/protocol/protocol.md) · [Docker](docs/operations/docker.md) · [iOS](docs/apple/ios.md) · [Mac](docs/apple/mac.md) · [Android](docs/android/android.md) · [Web](docs/web/web.md) · [Desktop](docs/desktop/desktop.md) · [All docs](CLAUDE.md#docs-index)
 
 ## License
 
