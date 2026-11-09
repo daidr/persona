@@ -23,6 +23,9 @@ type chatState struct {
 	busy     map[string]bool
 	// pane is what the agent's page shows: its chat, terminal or changes.
 	pane int
+	// files are the pictures waiting to go with the next message; uploads and reading count files on their way.
+	files            []attachment
+	uploads, reading int
 }
 
 func (a *App) chat(key string) *chatState {
@@ -108,28 +111,39 @@ func (a *App) loadOlder(key string) {
 	})
 }
 
-// send sends the draft to the agent, showing it at once and taking it back if the hub refuses.
+// send sends the draft to the agent, with the pictures attached to it, showing it at once and taking it back if
+// the hub refuses.
 func (a *App) send(key, text string) {
 	text = strings.TrimSpace(text)
-	if text == "" || a.conn == nil {
+	if a.conn == nil {
 		return
 	}
+	st := a.chat(key)
+	files := st.files
+	if text == "" && len(files) == 0 {
+		return
+	}
+	st.files = nil
 	c := a.conn
 	machine, session, _ := strings.Cut(key, "/")
 	id := hubapi.OpID()
 	t := c.data.Transcript(key)
-	t.Pending(text, id)
-	a.chat(key).list.ScrollToEnd()
+	pics := images(files)
+	t.Pending(text, id, pics...)
+	st.list.ScrollToEnd()
 	a.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 		defer cancel()
-		err := c.client.Send(ctx, machine, session, text, id)
+		err := c.client.Send(ctx, machine, session, text, id, pics...)
 		a.Host.Post(func() {
 			if err != nil && a.live(c) {
 				t.Drop(id)
 				st := a.chat(key)
 				if st.draft == "" {
 					st.draft = text
+				}
+				if len(st.files) == 0 {
+					st.files = files
 				}
 				a.toast(a.tr("sendFailed", "error", a.errorText(err)))
 			}
@@ -299,10 +313,7 @@ func (a *App) itemView(c *ui.Context, p palette, st *chatState, it hubapi.Item, 
 	case it.Kind == "tool_result":
 		ui.Text(c, oneLine(it.Text, 300)).FontSize(small).TextColor(p.red).MaxLines(4).Selectable()
 	case it.Kind == "image":
-		ui.Row(c).Gap(6).Children(func() {
-			ui.Icon(c, icon("read")).FontSize(small).TextColor(p.ink3)
-			ui.Text(c, a.tr("image")).FontSize(small).TextColor(p.ink3)
-		})
+		a.imageView(c, p, it, it.Role == "user")
 	case it.Kind == "fold" && it.Fold != nil:
 		ui.Text(c, a.tr("folded", "count", itoa(it.Fold.Items))).FontSize(small).TextColor(p.ink3)
 	case it.Injected != nil && it.Injected.Line != "":
@@ -327,7 +338,8 @@ func toolSummary(in map[string]any) string {
 func (a *App) composer(c *ui.Context, p palette, key string, x hubapi.Session, known bool, st *chatState) {
 	can := !known || x.Can("send")
 	working := known && a.conn.data.StateOf(x) == hubapi.StateWorking
-	ui.Row(c).Margin(4, pagePad, 16, pagePad).Padding(8, 8, 8, 14).Gap(8).Radius(cardRadius).Background(p.surface).
+	a.attachmentsRow(c, p, key, st)
+	box := ui.Row(c).Margin(4, pagePad, 16, pagePad).Padding(8, 8, 8, 14).Gap(8).Radius(cardRadius).Background(p.surface).
 		Border(1, p.line).AlignItems(ui.End).Children(func() {
 		place := a.tr("composerPlaceholder")
 		if !can {
@@ -349,11 +361,20 @@ func (a *App) composer(c *ui.Context, p palette, key string, x hubapi.Session, k
 				a.interrupt(key)
 			}
 		}
-		if ui.PrimaryButton(c, "").Label(a.tr("send")).Tooltip(a.tr("send")).Disabled(!can || strings.TrimSpace(st.draft) == "").
+		if ui.Button(c, "").Label(a.tr("attach")).Tooltip(a.tr("attach")).Disabled(!can).
+			Children(func() { ui.Icon(c, icon("clip")) }).Clicked() {
+			a.pickFiles(key)
+		}
+		if ui.PrimaryButton(c, "").Label(a.tr("send")).Tooltip(a.tr("send")).
+			Disabled(!can || strings.TrimSpace(st.draft) == "" && len(st.files) == 0).
 			Children(func() { ui.Icon(c, icon("send")) }).Clicked() {
 			text := st.draft
 			st.draft = ""
 			a.send(key, text)
 		}
 	})
+	// files dragged onto the box are attached as the paper clip's are
+	if dropped := box.DroppedFiles(); len(dropped) > 0 && can {
+		a.addFiles(key, dropped)
+	}
 }

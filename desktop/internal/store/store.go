@@ -6,6 +6,7 @@ package store
 import (
 	"cmp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/nwverse/persona/desktop/internal/hubapi"
@@ -300,6 +301,7 @@ func (t *Transcript) Merge(items []hubapi.Item) {
 	for i, it := range t.Items {
 		at[it.ID] = i
 	}
+	sent := map[string]bool{}
 	for _, it := range items {
 		if i, ok := at[it.ID]; ok && it.ID != "" {
 			t.Items[i] = it
@@ -307,13 +309,20 @@ func (t *Transcript) Merge(items []hubapi.Item) {
 		}
 		// the hub's copy of a message sent from here replaces the one shown while sending
 		if it.ClientMsg != "" {
-			if i := slices.IndexFunc(t.Items, func(x hubapi.Item) bool { return x.ClientMsg == it.ClientMsg && x.Seq < 0 }); i >= 0 {
+			sent[it.ClientMsg] = true
+			if i := slices.IndexFunc(t.Items, func(x hubapi.Item) bool {
+				return x.ClientMsg == it.ClientMsg && x.Seq < 0 && x.Kind == it.Kind
+			}); i >= 0 {
 				t.Items[i] = it
 				continue
 			}
 		}
 		at[it.ID] = len(t.Items)
 		t.Items = append(t.Items, it)
+	}
+	// the rest of a message the hub has (its pictures, when the hub's copies don't carry the id) goes too
+	if len(sent) > 0 {
+		t.Items = slices.DeleteFunc(t.Items, func(x hubapi.Item) bool { return x.Seq < 0 && sent[x.ClientMsg] })
 	}
 	slices.SortStableFunc(t.Items, func(a, b hubapi.Item) int {
 		// items being sent (negative seq) stay last
@@ -328,8 +337,14 @@ func (t *Transcript) Merge(items []hubapi.Item) {
 }
 
 // Pending adds a message being sent, shown until the hub's copy arrives.
-func (t *Transcript) Pending(text, clientMsg string) {
-	t.Items = append(t.Items, hubapi.Item{ID: "local-" + clientMsg, Seq: -1, Role: "user", Kind: "text", Text: text, ClientMsg: clientMsg})
+func (t *Transcript) Pending(text, clientMsg string, images ...hubapi.Image) {
+	for i, im := range images {
+		t.Items = append(t.Items, hubapi.Item{ID: "local-" + clientMsg + "-" + strconv.Itoa(i), Seq: -1, Role: "user", Kind: "image",
+			ClientMsg: clientMsg, Image: &im})
+	}
+	if text != "" {
+		t.Items = append(t.Items, hubapi.Item{ID: "local-" + clientMsg, Seq: -1, Role: "user", Kind: "text", Text: text, ClientMsg: clientMsg})
+	}
 }
 
 // Drop removes a message being sent that failed.

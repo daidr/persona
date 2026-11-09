@@ -105,6 +105,12 @@ func (d *desktop) appMenu() *mygo.Menu {
 		goItems = append(goItems, &mygo.MenuItem{Label: d.tr(p.key), Accelerator: p.accel, Click: func(*mygo.MenuItem, *mygo.Window) { d.goTo(path) }})
 	}
 	goItems = append(goItems, mygo.Separator(),
+		&mygo.MenuItem{Label: d.tr("menuPalette"), Accelerator: "CmdOrCtrl+K", Click: func(*mygo.MenuItem, *mygo.Window) {
+			d.show()
+			d.app.OpenPalette()
+			d.redraw()
+		}},
+		mygo.Separator(),
 		&mygo.MenuItem{Label: d.tr("menuBack"), Accelerator: "CmdOrCtrl+[", Click: func(*mygo.MenuItem, *mygo.Window) {
 			d.app.Back()
 			d.redraw()

@@ -126,3 +126,21 @@ func TestTodos(t *testing.T) {
 		t.Fatal("drop")
 	}
 }
+
+// A message sent with pictures shows them at once; the hub's copy replaces the text and the pictures alike.
+func TestPendingImages(t *testing.T) {
+	var tr Transcript
+	tr.Pending("look", "c1", hubapi.Image{Mime: "image/png", Data: "AA=="}, hubapi.Image{Mime: "image/png", Data: "AQ=="})
+	if len(tr.Items) != 3 || tr.Items[0].Kind != "image" || tr.Items[2].Kind != "text" {
+		t.Fatalf("pending: %+v", tr.Items)
+	}
+	tr.Merge([]hubapi.Item{{ID: "u1", Seq: 10, Role: "user", Kind: "text", Text: "look", ClientMsg: "c1"}, {ID: "u2", Seq: 11, Role: "user", Kind: "image"}})
+	if len(tr.Items) != 2 || tr.Items[0].ID != "u1" || tr.Items[1].ID != "u2" {
+		t.Fatalf("merged: %+v", tr.Items)
+	}
+	tr.Pending("", "c2", hubapi.Image{Mime: "image/png"})
+	tr.Drop("c2")
+	if len(tr.Items) != 2 {
+		t.Fatalf("dropped: %+v", tr.Items)
+	}
+}

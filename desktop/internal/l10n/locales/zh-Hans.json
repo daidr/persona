@@ -241,5 +241,22 @@
   "formOpenLink": "打开链接",
   "formDone": "已完成",
   "formSubmit": "提交",
-  "formMissing": "请填写“{field}”"
+  "formMissing": "请填写“{field}”",
+  "attach": "添加文件",
+  "attachTitle": "添加到消息",
+  "attachNotFile": "“{name}”不是文件",
+  "attachImageTooBig": "“{name}”超过 8 MB",
+  "attachUnreadable": "读不了图片“{name}”",
+  "attachFileTooBig": "“{name}”超过 200 MB",
+  "attachUploadFailed": "没能发送“{name}”：{error}",
+  "attachTooMany": "一条消息最多带 {count} 张图片",
+  "attachRemove": "移除 {name}",
+  "attachSending": "正在发送 {count} 个…",
+  "menuPalette": "前往任意位置…",
+  "palettePlaceholder": "前往 Agent、对话、待办或页面",
+  "paletteAction": "操作",
+  "palettePage": "页面",
+  "paletteHub": "hub",
+  "paletteSwitchHub": "切换到 {hub}",
+  "paletteNothing": "没有匹配的结果"
 }

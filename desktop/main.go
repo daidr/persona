@@ -235,6 +235,19 @@ func (d *desktop) OpenURL(url string) {
 	}
 }
 
+func (d *desktop) PickFiles(title string, done func([]string)) {
+	// the dialog waits for the user, so it is asked for off the main thread
+	go func() {
+		paths, err := mygo.Dialog.Open(mygo.OpenDialogOptions{Parent: d.win, Title: title, Multiple: true})
+		if err != nil {
+			log.Println("open dialog:", err)
+		}
+		if len(paths) > 0 {
+			d.Post(func() { done(paths) })
+		}
+	}()
+}
+
 func (d *desktop) Focused() bool {
 	return d.win != nil && !d.win.IsDestroyed() && d.win.IsVisible() && d.win.IsFocused()
 }

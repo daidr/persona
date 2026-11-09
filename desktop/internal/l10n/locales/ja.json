@@ -241,5 +241,22 @@
   "formOpenLink": "リンクを開く",
   "formDone": "完了",
   "formSubmit": "送信",
-  "formMissing": "「{field}」を入力してください"
+  "formMissing": "「{field}」を入力してください",
+  "attach": "ファイルを添付",
+  "attachTitle": "メッセージに添付",
+  "attachNotFile": "「{name}」はファイルではありません",
+  "attachImageTooBig": "「{name}」は 8 MB を超えています",
+  "attachUnreadable": "画像「{name}」を読み込めませんでした",
+  "attachFileTooBig": "「{name}」は 200 MB を超えています",
+  "attachUploadFailed": "「{name}」を送信できませんでした：{error}",
+  "attachTooMany": "1 つのメッセージに添付できる画像は {count} 枚までです",
+  "attachRemove": "{name} を削除",
+  "attachSending": "{count} 件を送信中…",
+  "menuPalette": "どこへでも移動…",
+  "palettePlaceholder": "エージェント、チャット、To-do、ページへ移動",
+  "paletteAction": "操作",
+  "palettePage": "ページ",
+  "paletteHub": "ハブ",
+  "paletteSwitchHub": "{hub} に切り替え",
+  "paletteNothing": "一致するものはありません"
 }

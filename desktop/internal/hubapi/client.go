@@ -120,14 +120,27 @@ func (c *Client) endpoint(path string) string {
 
 // Do sends a request and decodes the answer into out (when not nil).
 func (c *Client) Do(ctx context.Context, method, path string, body, out any) error {
-	var rd io.Reader
-	if body != nil {
-		b, err := json.Marshal(body)
-		if err != nil {
-			return err
-		}
-		rd = bytes.NewReader(b)
+	if body == nil {
+		return c.send(ctx, method, path, "", nil, -1, out)
 	}
+	b, err := json.Marshal(body)
+	if err != nil {
+		return err
+	}
+	return c.send(ctx, method, path, "application/json", bytes.NewReader(b), int64(len(b)), out)
+}
+
+// Upload puts a file on a computer, in its temporary folder (POST /machines/{mid}/files), and says where it went.
+func (c *Client) Upload(ctx context.Context, machine, name string, body io.Reader, size int64) (string, error) {
+	var out struct {
+		Path string `json:"path"`
+	}
+	err := c.send(ctx, http.MethodPost, "/machines/"+url.PathEscape(machine)+"/files?name="+url.QueryEscape(name),
+		"application/octet-stream", body, size, &out)
+	return out.Path, err
+}
+
+func (c *Client) send(ctx context.Context, method, path, contentType string, rd io.Reader, size int64, out any) error {
 	if method == http.MethodGet {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, readTimeout)
@@ -140,8 +153,11 @@ func (c *Client) Do(ctx context.Context, method, path string, body, out any) err
 	if c.Token != "" {
 		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	if size >= 0 {
+		req.ContentLength = size
 	}
 	if method != http.MethodGet {
 		req.Header.Set("X-Persona-Op-Id", OpID())
@@ -220,9 +236,12 @@ func (c *Client) Items(ctx context.Context, machine, session string, before int6
 }
 
 // Send sends a message to an agent.
-func (c *Client) Send(ctx context.Context, machine, session, text, clientMsg string) error {
-	return c.Do(ctx, http.MethodPost, "/sessions/"+url.PathEscape(machine)+"/"+url.PathEscape(session)+"/messages",
-		map[string]string{"text": text, "client_msg_id": clientMsg}, nil)
+func (c *Client) Send(ctx context.Context, machine, session, text, clientMsg string, images ...Image) error {
+	body := map[string]any{"text": text, "client_msg_id": clientMsg}
+	if len(images) > 0 {
+		body["images"] = images
+	}
+	return c.Do(ctx, http.MethodPost, "/sessions/"+url.PathEscape(machine)+"/"+url.PathEscape(session)+"/messages", body, nil)
 }
 
 // Interrupt stops an agent's turn.

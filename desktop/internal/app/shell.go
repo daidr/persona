@@ -69,6 +69,7 @@ func (a *App) View(c *ui.Context) {
 		})
 	})
 	a.startView(c, p)
+	a.paletteView(c, p)
 }
 
 // section is the sidebar item a path belongs to.

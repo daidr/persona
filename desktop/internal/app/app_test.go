@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	"image/color"
 	"image/png"
 	"net"
 	"net/http"
@@ -24,6 +26,7 @@ import (
 // fakeHost runs everything at once, keeps secrets in memory and records what the app asked of the platform.
 type fakeHost struct {
 	secrets  map[string]string
+	pick     []string
 	notes    []Notification
 	badge    int
 	opened   []string
@@ -52,6 +55,11 @@ func (h *fakeHost) SetOpenAtLogin(on bool) error { h.login = on; return nil }
 func (h *fakeHost) Shortcut() string             { return "Ctrl+Alt+P" }
 func (h *fakeHost) SetShortcut(on bool)          { h.shortcut = on }
 func (h *fakeHost) HubsChanged()                 {}
+func (h *fakeHost) PickFiles(_ string, done func([]string)) {
+	if len(h.pick) > 0 {
+		done(h.pick)
+	}
+}
 
 var mockURL string
 
@@ -789,5 +797,183 @@ func TestMCPForm(t *testing.T) {
 	vals["replicas"] = []string{"2.5"}
 	if _, missing := formContent(ix.Elicitation.Schema.Fields, ix.Elicitation.Schema.Required, vals); missing != "Replicas" {
 		t.Fatalf("a fraction passes as an integer: %q", missing)
+	}
+}
+
+func TestAttachments(t *testing.T) {
+	a, h := signedIn(t, "en")
+	var x hubapi.Session
+	for _, list := range a.conn.data.Sessions {
+		for _, s := range list {
+			if s.Cwd == "/Users/me/code/weather" && s.Can("send") {
+				x = s
+			}
+		}
+	}
+	if x.SessionID == "" {
+		t.Fatal("no agent in the weather folder")
+	}
+	dir := t.TempDir()
+	pic := filepath.Join(dir, "chart.png")
+	img := image.NewRGBA(image.Rect(0, 0, 120, 80))
+	for y := 0; y < 80; y++ {
+		for x := 0; x < 120; x++ {
+			img.Set(x, y, color.RGBA{uint8(x * 2), uint8(y * 3), 200, 255})
+		}
+	}
+	f, _ := os.Create(pic)
+	_ = png.Encode(f, img)
+	f.Close()
+	notes := filepath.Join(dir, "release notes.txt")
+	_ = os.WriteFile(notes, []byte("v2"), 0o644)
+	big := filepath.Join(dir, "huge.png")
+	_ = os.WriteFile(big, make([]byte, maxImage+1), 0o644)
+
+	a.Navigate("/agents/" + x.Key())
+	tt := ui.NewTester(a.View, 1280, 800)
+	tt.Frame()
+	h.pick = []string{pic, notes, big}
+	if err := tt.Click(a.tr("attach")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	st := a.chat(x.Key())
+	if len(st.files) != 1 || st.files[0].name != "chart.png" || st.files[0].img == nil {
+		t.Fatalf("pictures: %+v", st.files)
+	}
+	if !strings.HasPrefix(st.draft, "'/tmp/release notes-") || st.uploads != 0 {
+		t.Fatalf("draft: %q", st.draft)
+	}
+	if !tt.HasText(a.tr("attachImageTooBig", "name", "huge.png")) {
+		t.Fatalf("no word on the picture that's too big: %v", tt.Texts())
+	}
+	// a picture dragged onto the composer is attached too
+	r, ok := tt.Find(a.tr("composerPlaceholder"))
+	if !ok {
+		t.Fatal("no composer")
+	}
+	if !tt.DropFiles(r.X+10, r.Y+5, pic) {
+		t.Fatal("the composer didn't take the drop")
+	}
+	tt.Frame()
+	if len(st.files) != 2 {
+		t.Fatalf("after the drop: %d pictures", len(st.files))
+	}
+	shot(t, tt, "attachments-light")
+	tt.SetDark(true)
+	shot(t, tt, "attachments-dark")
+	tt.SetDark(false)
+	if err := tt.Click(a.tr("attachRemove", "name", "chart.png")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if len(st.files) != 1 {
+		t.Fatalf("after removing one: %d", len(st.files))
+	}
+	if err := tt.Click(a.tr("send")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if len(st.files) != 0 || st.draft != "" {
+		t.Fatalf("not sent: %+v %q", st.files, st.draft)
+	}
+	var sent struct {
+		Sent []struct {
+			Text   string         `json:"text"`
+			Images []hubapi.Image `json:"images"`
+		} `json:"sent"`
+	}
+	getJSON(t, mockURL+"/mock/sent", &sent)
+	last := sent.Sent[len(sent.Sent)-1]
+	if len(last.Images) != 1 || last.Images[0].Mime != "image/png" || !strings.Contains(last.Text, "release notes") {
+		t.Fatalf("sent: %+v", last)
+	}
+	// the picture shows in the chat, from the hub's copy or the one being sent
+	shown := false
+	for _, it := range a.conn.data.Transcript(x.Key()).Items {
+		if it.Kind == "image" && a.images[it.ID] != nil {
+			shown = true
+		}
+	}
+	tt.Frame()
+	for _, it := range a.conn.data.Transcript(x.Key()).Items {
+		if it.Kind == "image" && a.images[it.ID] != nil {
+			shown = true
+		}
+	}
+	if !shown {
+		t.Fatal("the picture isn't in the chat")
+	}
+	shot(t, tt, "attachments-sent")
+}
+
+func TestPalette(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	tt := ui.NewTester(a.View, 1280, 800)
+	tt.Frame()
+	tt.Key(ui.Cmd, ui.KeyK)
+	tt.Frame()
+	if !a.palette.open || !tt.HasText(a.tr("startTitle")) {
+		t.Fatal("⌘K didn't open the palette")
+	}
+	shot(t, tt, "palette-light")
+	tt.Type("heic")
+	tt.Frame()
+	list := matchCommands(a.commands(), a.palette.query)
+	if len(list) == 0 || !strings.Contains(list[0].title, "HEIC") {
+		t.Fatalf("matches for heic: %+v", list)
+	}
+	tt.SetDark(true)
+	shot(t, tt, "palette-dark")
+	tt.SetDark(false)
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.palette.open || !strings.HasPrefix(a.router.Path(), "/agents/") || !strings.HasSuffix(a.router.Path(), list[0].id[len("agent:"):]) {
+		t.Fatalf("enter: open %v at %s", a.palette.open, a.router.Path())
+	}
+	// arrows move the choice; a page by its name
+	a.OpenPalette()
+	tt.Frame()
+	tt.Type("to-dos")
+	tt.Frame()
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.router.Path() != "/todos" {
+		t.Fatalf("to-dos went to %s", a.router.Path())
+	}
+	a.OpenPalette()
+	tt.Frame()
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyDown)
+	tt.Key(0, ui.KeyUp)
+	tt.Frame()
+	if a.palette.sel != 1 {
+		t.Fatalf("choice after down, down, up: %d", a.palette.sel)
+	}
+	tt.Key(0, ui.KeyEnter)
+	tt.Frame()
+	if a.router.Path() != "/persona/new" {
+		t.Fatalf("the second command went to %s", a.router.Path())
+	}
+	a.OpenPalette()
+	tt.Frame()
+	tt.Type("zzzz-nothing")
+	tt.Frame()
+	if !tt.HasText(a.tr("paletteNothing")) {
+		t.Fatal("no word when nothing matches")
+	}
+}
+
+func TestMatchCommands(t *testing.T) {
+	all := []command{{id: "a", title: "Settings", sub: "Page"}, {id: "b", title: "Open settings of the hub", sub: "Action"}, {id: "c", title: "Weather", sub: "MacBook"}}
+	got := matchCommands(all, "set")
+	if len(got) != 2 || got[0].id != "a" {
+		t.Fatalf("set: %+v", got)
+	}
+	if got := matchCommands(all, "weather macbook"); len(got) != 1 || got[0].id != "c" {
+		t.Fatalf("two words: %+v", got)
+	}
+	if got := matchCommands(all, " "); len(got) != 3 {
+		t.Fatalf("empty: %+v", got)
 	}
 }

@@ -49,6 +49,9 @@ type Host interface {
 	SetShortcut(on bool)
 	// HubsChanged says the list of hubs or the one open changed, for the menus.
 	HubsChanged()
+	// PickFiles asks for files with the system's dialog and gives their paths to done on the main thread; it doesn't
+	// call done when the user cancels.
+	PickFiles(title string, done func(paths []string))
 }
 
 // App is the whole interface's state.
@@ -70,7 +73,10 @@ type App struct {
 
 	connect connectForm
 	agents  agentsPage
+	palette paletteState
 	chats   map[string]*chatState
+	// images are the chats' pictures, decoded, by item id.
+	images  map[string]ui.ImageSource
 	inbox   inboxPage
 	sets    settingsPage
 	todos   todosPage
@@ -100,7 +106,7 @@ type conn struct {
 
 // New makes the app's state. Start connects to the hub opened last.
 func New(host Host, list *hubs.Store, lang, version string) *App {
-	a := &App{Host: host, Hubs: list, Lang: lang, Version: version, router: ui.NewRouter("/"), chats: map[string]*chatState{}}
+	a := &App{Host: host, Hubs: list, Lang: lang, Version: version, router: ui.NewRouter("/"), chats: map[string]*chatState{}, images: map[string]ui.ImageSource{}}
 	a.Go = func(fn func()) { go fn() }
 	a.RunSocket = func(ctx context.Context, s *hubapi.Socket) { go s.Run(ctx) }
 	a.After = func(d time.Duration, fn func()) { time.AfterFunc(d, func() { a.Host.Post(fn) }) }

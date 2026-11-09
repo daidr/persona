@@ -142,11 +142,8 @@ type Item struct {
 	Queued    bool           `json:"queued,omitempty"`
 	From      string         `json:"from,omitempty"`
 	ClientMsg string         `json:"client_msg_id,omitempty"`
-	Image     *struct {
-		Mime string `json:"mime"`
-		Data string `json:"data,omitempty"`
-	} `json:"image,omitempty"`
-	Fold *struct {
+	Image     *Image         `json:"image,omitempty"`
+	Fold      *struct {
 		Items    int   `json:"items"`
 		Tools    int   `json:"tools"`
 		Thoughts int   `json:"thoughts"`
@@ -637,4 +634,10 @@ type GitDiff struct {
 	Path      string `json:"path"`
 	Diff      string `json:"diff"`
 	Truncated bool   `json:"truncated,omitempty"`
+}
+
+// Image is a picture in a message: its type and its bytes in base64.
+type Image struct {
+	Mime string `json:"mime"`
+	Data string `json:"data,omitempty"`
 }

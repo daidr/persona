@@ -241,5 +241,22 @@
   "formOpenLink": "Open the link",
   "formDone": "Done",
   "formSubmit": "Submit",
-  "formMissing": "Fill in “{field}”"
+  "formMissing": "Fill in “{field}”",
+  "attach": "Attach files",
+  "attachTitle": "Attach to the message",
+  "attachNotFile": "“{name}” isn't a file",
+  "attachImageTooBig": "“{name}” is over 8 MB",
+  "attachUnreadable": "Couldn't read the picture “{name}”",
+  "attachFileTooBig": "“{name}” is over 200 MB",
+  "attachUploadFailed": "Couldn't send “{name}”: {error}",
+  "attachTooMany": "A message takes at most {count} pictures",
+  "attachRemove": "Remove {name}",
+  "attachSending": "Sending {count}…",
+  "menuPalette": "Go to Anything…",
+  "palettePlaceholder": "Go to an agent, a chat, a to-do or a page",
+  "paletteAction": "Action",
+  "palettePage": "Page",
+  "paletteHub": "Hub",
+  "paletteSwitchHub": "Switch to {hub}",
+  "paletteNothing": "Nothing matches"
 }
