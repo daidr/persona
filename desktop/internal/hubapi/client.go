@@ -261,8 +261,42 @@ func (c *Client) Inbox(ctx context.Context) ([]InboxItem, error) {
 	var out struct {
 		Items []InboxItem `json:"items"`
 	}
-	err := c.Do(ctx, http.MethodGet, "/inbox", nil, &out)
+	err := c.Do(ctx, http.MethodGet, "/inbox?sources=all", nil, &out)
 	return out.Items, err
+}
+
+// InboxDismiss ignores an Inbox entry ("Ignore": handled without an answer).
+func (c *Client) InboxDismiss(ctx context.Context, id string) error {
+	return c.Do(ctx, http.MethodPost, "/inbox/"+url.PathEscape(id)+"/done", map[string]bool{"done": true, "dismiss": true}, nil)
+}
+
+// InboxDraft asks the assistant to draft a reply in the user's voice, following instruction when it isn't "".
+func (c *Client) InboxDraft(ctx context.Context, id, instruction string) (string, error) {
+	var out struct {
+		Text string `json:"text"`
+	}
+	err := c.Do(ctx, http.MethodPost, "/inbox/"+url.PathEscape(id)+"/draft", map[string]string{"instruction": instruction}, &out)
+	return out.Text, err
+}
+
+// InboxReply sends a reply where the entry came from and marks it handled; clientID makes a retry send once.
+func (c *Client) InboxReply(ctx context.Context, id, text, clientID, version string) (InboxItem, error) {
+	var out InboxItem
+	body := map[string]string{"text": text, "client_id": clientID}
+	if version != "" {
+		body["expected_version"] = version
+	}
+	err := c.Do(ctx, http.MethodPost, "/inbox/"+url.PathEscape(id)+"/reply", body, &out)
+	return out, err
+}
+
+// InboxHandoff hands the entry to the assistant's main chat with text, so it may answer it.
+func (c *Client) InboxHandoff(ctx context.Context, id, text, clientID string) (Session, error) {
+	var out struct {
+		Session Session `json:"session"`
+	}
+	err := c.Do(ctx, http.MethodPost, "/inbox/"+url.PathEscape(id)+"/handoff", map[string]string{"text": text, "client_id": clientID}, &out)
+	return out.Session, err
 }
 
 // InboxDone marks an Inbox entry handled, or not.

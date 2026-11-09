@@ -226,5 +226,20 @@
   "personaUnarchive": "Unarchive",
   "cardDrawing": "Drawing a card…",
   "cardBack": "Back",
-  "cardConfirm": "Continue"
+  "cardConfirm": "Continue",
+  "inboxReply": "Reply",
+  "inboxDrafted": "Persona drafted this reply",
+  "inboxReplyPlaceholder": "Write a reply",
+  "inboxAskPlaceholder": "What to say, for Persona (optional)",
+  "inboxDraft": "Draft with Persona",
+  "inboxHandoff": "Hand to Persona",
+  "inboxHandoffText": "Please handle this for me.",
+  "inboxIgnore": "Ignore",
+  "inboxSend": "Send",
+  "inboxSent": "Reply sent",
+  "formFrom": "Asked by {server}",
+  "formOpenLink": "Open the link",
+  "formDone": "Done",
+  "formSubmit": "Submit",
+  "formMissing": "Fill in “{field}”"
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/egoist/mygo/ui"
@@ -13,6 +14,9 @@ type inboxPage struct {
 	list     ui.ListState
 	showDone bool
 	busy     map[string]bool
+	// the reply being written: for which entry, its text, the instruction for a draft
+	replyFor, reply, ask string
+	drafting, sending    bool
 }
 
 func (a *App) inboxItems() []hubapi.InboxItem {
@@ -131,7 +135,11 @@ func (a *App) inboxDetail(c *ui.Context, p palette, it hubapi.InboxItem) {
 	busy := a.inbox.busy[it.ID]
 	a.pageHeader(c, p, inboxTitle(it), sub, func() {
 		if it.Connector != nil && it.Connector.URL != "" {
-			if ui.Button(c, a.tr("openIn", "app", it.Connector.Label)).Clicked() {
+			app := it.AccountName
+			if app == "" {
+				app = it.Source
+			}
+			if ui.Button(c, a.tr("openIn", "app", app)).Clicked() {
 				a.Host.OpenURL(it.Connector.URL)
 			}
 		}
@@ -163,6 +171,161 @@ func (a *App) inboxDetail(c *ui.Context, p palette, it hubapi.InboxItem) {
 		if it.Count > 1 {
 			ui.Text(c, a.tr("inboxCount", "count", itoa(it.Count))).FontSize(small).TextColor(p.ink3)
 		}
+		if !it.Done() {
+			a.replyCard(c, p, it)
+		}
+	})
+}
+
+// replyCard answers an entry: a reply written here or drafted by Persona, sent where the entry came from; or the
+// entry handed to Persona; or ignored.
+func (a *App) replyCard(c *ui.Context, p palette, it hubapi.InboxItem) {
+	g := &a.inbox
+	if g.replyFor != it.ID {
+		g.replyFor, g.reply, g.ask = it.ID, it.Drafted(), ""
+	}
+	a.card(c, p, func() {
+		if it.CanReply() {
+			ui.Text(c, a.tr("inboxReply")).Bold()
+			if d := it.Drafted(); d != "" {
+				ui.Row(c).Gap(6).Children(func() {
+					ui.Icon(c, icon("spark")).FontSize(small).TextColor(p.ai)
+					ui.Text(c, a.tr("inboxDrafted")).FontSize(small).TextColor(p.ai)
+				})
+				if it.Agent.Note != "" {
+					ui.Text(c, it.Agent.Note).FontSize(small).TextColor(p.ink2).Selectable()
+				}
+			}
+			ui.TextArea(c.Key("reply-"+it.ID), &g.reply).Lines(3, 10).Placeholder(a.tr("inboxReplyPlaceholder")).Label(a.tr("inboxReply"))
+			ui.Row(c).Gap(8).Children(func() {
+				ui.TextInput(c.Key("ask-"+it.ID), &g.ask).Placeholder(a.tr("inboxAskPlaceholder")).Label(a.tr("inboxAskPlaceholder")).Grow(1)
+				if g.drafting {
+					ui.Spinner(c)
+				}
+				if ui.Button(c, a.tr("inboxDraft")).Disabled(g.drafting || g.sending).Clicked() {
+					a.draftReply(it)
+				}
+			})
+		}
+		ui.Row(c).Gap(8).Children(func() {
+			if ui.Button(c, a.tr("inboxHandoff")).Disabled(g.sending).Clicked() {
+				a.handoff(it)
+			}
+			if ui.Button(c, a.tr("inboxIgnore")).Disabled(g.sending).Clicked() {
+				a.ignoreInbox(it)
+			}
+			ui.Spacer(c)
+			if it.CanReply() {
+				if g.sending {
+					ui.Spinner(c)
+				}
+				if ui.PrimaryButton(c, a.tr("inboxSend")).Disabled(g.sending || strings.TrimSpace(g.reply) == "").Clicked() {
+					a.sendReply(it)
+				}
+			}
+		})
+	})
+}
+
+func (a *App) draftReply(it hubapi.InboxItem) {
+	g := &a.inbox
+	cn := a.conn
+	ask := strings.TrimSpace(g.ask)
+	g.drafting = true
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+		defer cancel()
+		text, err := cn.client.InboxDraft(ctx, it.ID, ask)
+		a.Host.Post(func() {
+			g.drafting = false
+			if !a.live(cn) {
+				return
+			}
+			if err != nil {
+				a.toast(a.errorText(err))
+				return
+			}
+			if g.replyFor == it.ID {
+				g.reply = text
+			}
+		})
+	})
+}
+
+func (a *App) sendReply(it hubapi.InboxItem) {
+	g := &a.inbox
+	cn := a.conn
+	text := strings.TrimSpace(g.reply)
+	g.sending = true
+	id := hubapi.OpID()
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		got, err := cn.client.InboxReply(ctx, it.ID, text, id, it.Version)
+		a.Host.Post(func() {
+			g.sending = false
+			if !a.live(cn) {
+				return
+			}
+			if err != nil {
+				// the text stays to send again; the same id won't send twice
+				a.toast(a.errorText(err))
+				return
+			}
+			g.reply, g.ask = "", ""
+			if got.ID == "" {
+				got = it
+				got.DoneAt = time.Now().UTC().Format(time.RFC3339)
+			}
+			cn.data.PutInbox(got)
+			a.toast(a.tr("inboxSent"))
+		})
+	})
+}
+
+func (a *App) handoff(it hubapi.InboxItem) {
+	g := &a.inbox
+	cn := a.conn
+	text := strings.TrimSpace(g.ask)
+	if text == "" {
+		text = a.tr("inboxHandoffText")
+	}
+	g.sending = true
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		_, err := cn.client.InboxHandoff(ctx, it.ID, text, hubapi.OpID())
+		a.Host.Post(func() {
+			g.sending = false
+			if !a.live(cn) {
+				return
+			}
+			if err != nil {
+				a.toast(a.errorText(err))
+				return
+			}
+			a.refreshAssistant(cn)
+			a.Navigate("/")
+		})
+	})
+}
+
+func (a *App) ignoreInbox(it hubapi.InboxItem) {
+	cn := a.conn
+	a.Go(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		err := cn.client.InboxDismiss(ctx, it.ID)
+		a.Host.Post(func() {
+			if !a.live(cn) {
+				return
+			}
+			if err != nil {
+				a.toast(a.errorText(err))
+				return
+			}
+			cn.data.MarkInbox(it.ID, true, time.Now().UTC().Format(time.RFC3339))
+		})
 	})
 }
 

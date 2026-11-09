@@ -226,5 +226,20 @@
   "personaUnarchive": "取消归档",
   "cardDrawing": "正在生成卡片…",
   "cardBack": "返回",
-  "cardConfirm": "继续"
+  "cardConfirm": "继续",
+  "inboxReply": "回复",
+  "inboxDrafted": "Persona 拟好了这条回复",
+  "inboxReplyPlaceholder": "写回复",
+  "inboxAskPlaceholder": "想说什么，告诉 Persona（可选）",
+  "inboxDraft": "让 Persona 起草",
+  "inboxHandoff": "交给 Persona",
+  "inboxHandoffText": "帮我处理一下这条。",
+  "inboxIgnore": "忽略",
+  "inboxSend": "发送",
+  "inboxSent": "回复已发送",
+  "formFrom": "来自 {server}",
+  "formOpenLink": "打开链接",
+  "formDone": "已完成",
+  "formSubmit": "提交",
+  "formMissing": "请填写“{field}”"
 }

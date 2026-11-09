@@ -226,5 +226,20 @@
   "personaUnarchive": "アーカイブ解除",
   "cardDrawing": "カードを作成中…",
   "cardBack": "戻る",
-  "cardConfirm": "続ける"
+  "cardConfirm": "続ける",
+  "inboxReply": "返信",
+  "inboxDrafted": "Persona が返信を下書きしました",
+  "inboxReplyPlaceholder": "返信を書く",
+  "inboxAskPlaceholder": "伝えたいこと（Persona 向け、任意）",
+  "inboxDraft": "Persona に下書きを頼む",
+  "inboxHandoff": "Persona に任せる",
+  "inboxHandoffText": "これを対応してください。",
+  "inboxIgnore": "無視",
+  "inboxSend": "送信",
+  "inboxSent": "返信を送信しました",
+  "formFrom": "{server} からの質問",
+  "formOpenLink": "リンクを開く",
+  "formDone": "完了",
+  "formSubmit": "送信",
+  "formMissing": "「{field}」を入力してください"
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -70,6 +71,8 @@ func (a *App) cardView(c *ui.Context, p palette, x hubapi.Session, st *chatState
 			a.planCard(c, p, st, ix, busy)
 		case "screen":
 			a.screenCard(c, p, st, ix, busy)
+		case "elicitation":
+			a.formCard(c, p, st, ix, busy)
 		default:
 			a.otherCard(c, p, st, ix, busy)
 		}
@@ -253,6 +256,202 @@ func (a *App) otherCard(c *ui.Context, p palette, st *chatState, ix hubapi.Inter
 		}
 		if ui.Button(c, a.tr("dismiss")).Disabled(busy).Clicked() {
 			a.resolve(st, ix, hubapi.Resolution{Dismiss: true})
+		}
+	})
+}
+
+// formCard answers an MCP server's question: a form to fill in, or a link to open and confirm.
+func (a *App) formCard(c *ui.Context, p palette, st *chatState, ix hubapi.Interaction, busy bool) {
+	e := ix.Elicitation
+	if e == nil {
+		a.otherCard(c, p, st, ix, busy)
+		return
+	}
+	if ix.MCPServerName != "" {
+		ui.Text(c, a.tr("formFrom", "server", ix.MCPServerName)).FontSize(small).TextColor(p.ink2)
+	}
+	if e.Mode == "url" {
+		if e.URL != "" {
+			ui.Text(c, e.URL).FontSize(small).TextColor(p.ink3).SingleLine().Selectable()
+		}
+		ui.Row(c).Gap(8).Children(func() {
+			if ui.Button(c, a.tr("decline")).Disabled(busy).Clicked() {
+				a.resolve(st, ix, hubapi.Resolution{Action: "decline"})
+			}
+			ui.Spacer(c)
+			if strings.HasPrefix(e.URL, "https://") || strings.HasPrefix(e.URL, "http://") {
+				if ui.Button(c, a.tr("formOpenLink")).Clicked() {
+					a.Host.OpenURL(e.URL)
+				}
+			}
+			if ui.PrimaryButton(c, a.tr("formDone")).Disabled(busy).Clicked() {
+				a.resolve(st, ix, hubapi.Resolution{Action: "accept"})
+			}
+		})
+		return
+	}
+	vals := st.answers[ix.ID]
+	if vals == nil {
+		vals = formDefaults(e.Schema)
+		st.answers[ix.ID] = vals
+	}
+	var fields []hubapi.FormField
+	var required []string
+	if e.Schema != nil {
+		fields, required = e.Schema.Fields, e.Schema.Required
+	}
+	for _, f := range fields {
+		a.formField(c, p, ix.ID, f, slices.Contains(required, f.Name), vals)
+	}
+	content, missing := formContent(fields, required, vals)
+	ui.Row(c).Gap(8).Children(func() {
+		if ui.Button(c, a.tr("decline")).Disabled(busy).Clicked() {
+			a.resolve(st, ix, hubapi.Resolution{Action: "decline"})
+		}
+		ui.Spacer(c)
+		if missing != "" {
+			ui.Text(c, a.tr("formMissing", "field", missing)).FontSize(small).TextColor(p.ink3).SingleLine().Shrink(1)
+		}
+		if ui.PrimaryButton(c, a.tr("formSubmit")).Disabled(busy || missing != "").Clicked() {
+			a.resolve(st, ix, hubapi.Resolution{Action: "accept", Content: content})
+		}
+	})
+}
+
+func fieldTitle(f hubapi.FormField) string {
+	if f.Title != "" {
+		return f.Title
+	}
+	return f.Name
+}
+
+// formDefaults are a form's starting values, from its schema's defaults.
+func formDefaults(s *hubapi.FormSchema) map[string][]string {
+	out := map[string][]string{}
+	if s == nil {
+		return out
+	}
+	for _, f := range s.Fields {
+		switch d := f.Default.(type) {
+		case string:
+			out[f.Name] = []string{d}
+		case bool:
+			out[f.Name] = []string{strconv.FormatBool(d)}
+		case float64:
+			out[f.Name] = []string{strconv.FormatFloat(d, 'f', -1, 64)}
+		case []any:
+			for _, x := range d {
+				if v, ok := x.(string); ok {
+					out[f.Name] = append(out[f.Name], v)
+				}
+			}
+		}
+	}
+	return out
+}
+
+// formContent is what a form sends, by the types its schema names; missing is the first required field left empty
+// or a number that doesn't read.
+func formContent(fields []hubapi.FormField, required []string, vals map[string][]string) (map[string]any, string) {
+	out := map[string]any{}
+	missing := ""
+	need := func(f hubapi.FormField) {
+		if missing == "" && slices.Contains(required, f.Name) {
+			missing = fieldTitle(f)
+		}
+	}
+	for _, f := range fields {
+		v := vals[f.Name]
+		one := ""
+		if len(v) > 0 {
+			one = strings.TrimSpace(v[0])
+		}
+		switch f.Type {
+		case "boolean":
+			out[f.Name] = one == "true"
+		case "array":
+			if len(v) == 0 {
+				need(f)
+				continue
+			}
+			out[f.Name] = append([]string(nil), v...)
+		case "number", "integer":
+			if one == "" {
+				need(f)
+				continue
+			}
+			n, err := strconv.ParseFloat(one, 64)
+			if err != nil || (f.Type == "integer" && n != float64(int64(n))) {
+				if missing == "" {
+					missing = fieldTitle(f)
+				}
+				continue
+			}
+			out[f.Name] = n
+		default:
+			if one == "" {
+				need(f)
+				continue
+			}
+			out[f.Name] = one
+		}
+	}
+	return out, missing
+}
+
+// formField is one field: a switch, a drop-down, check boxes, or a text input.
+func (a *App) formField(c *ui.Context, p palette, id string, f hubapi.FormField, required bool, vals map[string][]string) {
+	label := fieldTitle(f)
+	if required {
+		label += " *"
+	}
+	values, labels := f.Choices()
+	ui.Column(c.Key("field:" + id + ":" + f.Name)).Gap(4).Children(func() {
+		if f.Type == "boolean" {
+			on := len(vals[f.Name]) > 0 && vals[f.Name][0] == "true"
+			if a.switchRow(c, p, label, f.Description, &on) {
+				vals[f.Name] = []string{strconv.FormatBool(on)}
+			}
+			return
+		}
+		ui.Text(c, label).FontSize(small).Bold().TextColor(p.ink2)
+		if f.Description != "" {
+			ui.Text(c, f.Description).FontSize(small).TextColor(p.ink3)
+		}
+		switch {
+		case f.Type == "array" && len(values) > 0:
+			ui.Row(c).Wrap().Gap(12).Children(func() {
+				for i, v := range values {
+					on := slices.Contains(vals[f.Name], v)
+					if ui.Checkbox(c.Key("opt:"+v), &on, labels[i]).Changed() {
+						if on {
+							vals[f.Name] = append(vals[f.Name], v)
+						} else {
+							vals[f.Name] = slices.DeleteFunc(vals[f.Name], func(x string) bool { return x == v })
+						}
+					}
+				}
+			})
+		case len(values) > 0:
+			cur := ""
+			if v := vals[f.Name]; len(v) > 0 {
+				if i := slices.Index(values, v[0]); i >= 0 {
+					cur = labels[i]
+				}
+			}
+			if ui.Select(c.Key("sel"), &cur, labels).Label(label).Changed() {
+				if i := slices.Index(labels, cur); i >= 0 {
+					vals[f.Name] = []string{values[i]}
+				}
+			}
+		default:
+			text := ""
+			if v := vals[f.Name]; len(v) > 0 {
+				text = v[0]
+			}
+			if ui.TextInput(c.Key("in"), &text).Label(label).Changed() {
+				vals[f.Name] = []string{text}
+			}
 		}
 	})
 }

@@ -695,3 +695,99 @@ func TestAssistantChatsAndCards(t *testing.T) {
 		t.Fatalf("new chat at %s", a.Path())
 	}
 }
+
+func TestInboxReply(t *testing.T) {
+	a, _ := signedIn(t, "zh-Hans")
+	d := a.conn.data
+	var drafted, mail hubapi.InboxItem
+	for _, it := range d.Inbox {
+		if it.Drafted() != "" && !it.Done() && drafted.ID == "" {
+			drafted = it
+		}
+		if it.Source == "mail" && !it.Done() && it.Drafted() == "" && mail.ID == "" {
+			mail = it
+		}
+	}
+	if drafted.ID == "" || mail.ID == "" {
+		t.Fatal("no drafted entry or mail")
+	}
+	a.Navigate("/inbox/" + drafted.ID)
+	tt := ui.NewTester(a.View, 1280, 900)
+	tt.Frame()
+	if a.inbox.reply != drafted.Drafted() || !tt.HasText(a.tr("inboxDrafted")) {
+		t.Fatalf("draft not offered: %q", a.inbox.reply)
+	}
+	shot(t, tt, "inbox-reply-zh")
+	tt.SetDark(true)
+	shot(t, tt, "inbox-reply-zh-dark")
+	tt.SetDark(false)
+	if err := tt.Click(a.tr("inboxSend")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	for _, it := range d.Inbox {
+		if it.ID == drafted.ID && !it.Done() {
+			t.Fatal("replied entry not handled")
+		}
+	}
+
+	// Persona drafts a reply to a mail
+	a.Navigate("/inbox/" + mail.ID)
+	tt.Frame()
+	if err := tt.Click(a.tr("inboxDraft")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	if a.inbox.reply == "" {
+		t.Fatal("no draft")
+	}
+}
+
+func TestMCPForm(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	var x hubapi.Session
+	for _, list := range a.conn.data.Sessions {
+		for _, s := range list {
+			if s.Can("approve") && len(a.conn.data.SessionInteractions(s.Key())) == 0 && x.SessionID == "" {
+				x = s
+			}
+		}
+	}
+	var ix hubapi.Interaction
+	if err := json.Unmarshal([]byte(`{"id":"form-1","machine_id":"`+x.MachineID+`","session_id":"`+x.SessionID+`","kind":"elicitation",
+		"mcp_server_name":"deploy-mcp","elicitation":{"mode":"form","message":"Confirm the deployment",
+		"requested_schema":{"type":"object","properties":{
+			"env":{"type":"string","title":"Environment","oneOf":[{"const":"staging","title":"Staging"},{"const":"prod","title":"Production"}]},
+			"replicas":{"type":"integer","title":"Replicas","default":2},
+			"notify":{"type":"boolean","title":"Notify the team","default":true},
+			"regions":{"type":"array","title":"Regions","items":{"enum":["us","eu"]}},
+			"note":{"type":"string","title":"Note"}},
+		"required":["env","replicas"]}}}`), &ix); err != nil {
+		t.Fatal(err)
+	}
+	if f := ix.Elicitation.Schema.Fields; len(f) != 5 || f[0].Name != "env" || f[4].Name != "note" {
+		t.Fatalf("fields out of order: %+v", f)
+	}
+	a.conn.data.Interactions[ix.ID] = ix
+	a.Navigate("/agents/" + x.Key())
+	tt := ui.NewTester(a.View, 1280, 900)
+	tt.Frame()
+	if !tt.HasText("Confirm the deployment") || !tt.HasText("Replicas *") || !tt.HasText(a.tr("formMissing", "field", "Environment")) {
+		t.Fatalf("form: %q", tt.Texts())
+	}
+	shot(t, tt, "mcp-form-light")
+	tt.SetDark(true)
+	shot(t, tt, "mcp-form-dark")
+	vals := a.chat(x.Key()).answers[ix.ID]
+	vals["env"] = []string{"prod"}
+	vals["regions"] = []string{"eu"}
+	content, missing := formContent(ix.Elicitation.Schema.Fields, ix.Elicitation.Schema.Required, vals)
+	if missing != "" || content["env"] != "prod" || content["replicas"] != float64(2) || content["notify"] != true ||
+		len(content["regions"].([]string)) != 1 || content["note"] != nil {
+		t.Fatalf("content %+v missing %q", content, missing)
+	}
+	vals["replicas"] = []string{"2.5"}
+	if _, missing := formContent(ix.Elicitation.Schema.Fields, ix.Elicitation.Schema.Required, vals); missing != "Replicas" {
+		t.Fatalf("a fraction passes as an integer: %q", missing)
+	}
+}

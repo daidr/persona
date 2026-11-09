@@ -4,6 +4,8 @@
 package hubapi
 
 import (
+	"bytes"
+	"cmp"
 	"encoding/json"
 	"time"
 )
@@ -213,11 +215,102 @@ type Interaction struct {
 		Label  string `json:"label"`
 		Secret bool   `json:"secret,omitempty"`
 	} `json:"fields,omitempty"`
-	Elicitation *struct {
-		Mode    string `json:"mode"`
-		Message string `json:"message,omitempty"`
-		URL     string `json:"url,omitempty"`
-	} `json:"elicitation,omitempty"`
+	Elicitation   *Elicitation `json:"elicitation,omitempty"`
+	MCPServerName string       `json:"mcp_server_name,omitempty"`
+}
+
+// Elicitation is an MCP server asking the user: a form to fill in, or a link to open (docs/protocol/protocol.md "MCP elicitation").
+type Elicitation struct {
+	Mode    string      `json:"mode"`
+	Message string      `json:"message,omitempty"`
+	URL     string      `json:"url,omitempty"`
+	Schema  *FormSchema `json:"requested_schema,omitempty"`
+}
+
+// FormSchema is a form's flat JSON Schema: its fields in the order the server wrote them.
+type FormSchema struct {
+	Fields   []FormField
+	Required []string
+}
+
+// FormField is one field of a form.
+type FormField struct {
+	Name        string
+	Type        string   `json:"type"`
+	Title       string   `json:"title,omitempty"`
+	Description string   `json:"description,omitempty"`
+	Enum        []string `json:"enum,omitempty"`
+	EnumNames   []string `json:"enumNames,omitempty"`
+	OneOf       []struct {
+		Const string `json:"const"`
+		Title string `json:"title,omitempty"`
+	} `json:"oneOf,omitempty"`
+	Items *struct {
+		Enum  []string `json:"enum,omitempty"`
+		AnyOf []struct {
+			Const string `json:"const"`
+			Title string `json:"title,omitempty"`
+		} `json:"anyOf,omitempty"`
+	} `json:"items,omitempty"`
+	Default any `json:"default,omitempty"`
+}
+
+// Choices are a field's values and what to call them, when it has a fixed set.
+func (f FormField) Choices() (values, labels []string) {
+	switch {
+	case len(f.OneOf) > 0:
+		for _, o := range f.OneOf {
+			values, labels = append(values, o.Const), append(labels, cmp.Or(o.Title, o.Const))
+		}
+	case len(f.Enum) > 0:
+		for i, v := range f.Enum {
+			l := v
+			if i < len(f.EnumNames) && f.EnumNames[i] != "" {
+				l = f.EnumNames[i]
+			}
+			values, labels = append(values, v), append(labels, l)
+		}
+	case f.Items != nil && len(f.Items.AnyOf) > 0:
+		for _, o := range f.Items.AnyOf {
+			values, labels = append(values, o.Const), append(labels, cmp.Or(o.Title, o.Const))
+		}
+	case f.Items != nil:
+		values, labels = f.Items.Enum, f.Items.Enum
+	}
+	return values, labels
+}
+
+// UnmarshalJSON reads the schema keeping its properties' order.
+func (s *FormSchema) UnmarshalJSON(b []byte) error {
+	var raw struct {
+		Properties json.RawMessage `json:"properties"`
+		Required   []string        `json:"required"`
+	}
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	s.Required = raw.Required
+	if len(raw.Properties) == 0 {
+		return nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw.Properties))
+	if _, err := dec.Token(); err != nil {
+		return err
+	}
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		name, _ := tok.(string)
+		var f FormField
+		if err := dec.Decode(&f); err != nil {
+			return err
+		}
+		f.Name = name
+		s.Fields = append(s.Fields, f)
+	}
+	return nil
 }
 
 // SessionKey is the key of the interaction's session.
@@ -236,6 +329,7 @@ type Resolution struct {
 	Message  string            `json:"message,omitempty"`
 	Values   map[string]string `json:"values,omitempty"`
 	Action   string            `json:"action,omitempty"`
+	Content  map[string]any    `json:"content,omitempty"`
 	Dismiss  bool              `json:"dismiss,omitempty"`
 }
 
@@ -266,9 +360,26 @@ type InboxItem struct {
 	Version     string `json:"version,omitempty"`
 	Connector   *struct {
 		Label    string `json:"label,omitempty"`
-		URL      string `json:"url,omitempty"`
+		URL      string `json:"open_url,omitempty"`
 		CanReply bool   `json:"can_reply,omitempty"`
 	} `json:"connector,omitempty"`
+	// Agent is the AI twin's work on the entry: its state and the reply it drafted.
+	Agent *struct {
+		State string `json:"state,omitempty"`
+		Draft string `json:"draft,omitempty"`
+		Note  string `json:"note,omitempty"`
+	} `json:"agent,omitempty"`
+}
+
+// CanReply tells an entry Persona can answer: a chat or a mail, or a connector's that says so.
+func (it InboxItem) CanReply() bool { return it.Connector == nil || it.Connector.CanReply }
+
+// Drafted is the reply the AI twin wrote, if it did.
+func (it InboxItem) Drafted() string {
+	if it.Agent != nil && it.Agent.State == "drafted" {
+		return it.Agent.Draft
+	}
+	return ""
 }
 
 // Done tells a handled entry.

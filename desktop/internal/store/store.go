@@ -249,6 +249,16 @@ func (s *Store) MarkInbox(id string, done bool, at string) {
 	}
 }
 
+// PutInbox replaces an entry with the hub's answer, until the next read.
+func (s *Store) PutInbox(it hubapi.InboxItem) {
+	for i := range s.Inbox {
+		if s.Inbox[i].ID == it.ID {
+			s.Inbox[i] = it
+			return
+		}
+	}
+}
+
 // Session finds an agent by key.
 func (s *Store) Session(key string) (hubapi.Session, bool) {
 	machine, id, ok := strings.Cut(key, "/")
