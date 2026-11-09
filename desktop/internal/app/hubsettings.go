@@ -44,6 +44,33 @@ type settingsPage struct {
 	modelEdit string // the use being changed
 	modelProv string
 	modelName string
+
+	persona   loadable
+	asst      hubapi.AssistantSettings
+	asstTasks []hubapi.Task
+	notes     string
+	notesBusy bool
+	memory    []hubapi.MemoryFile
+	memoryErr string
+	memOpen   *hubapi.MemoryEntry
+	memIndex  bool
+	memEdit   string
+	memEditing,
+	memAsk bool
+	memBusy  bool
+	skills   []hubapi.Skill
+	skillsOn string
+	skillErr string
+	asstBusy string
+
+	triage      loadable
+	triageSet   hubapi.Triage
+	triageNone  bool
+	profiles    hubapi.ModelProfiles
+	profilesOK  bool
+	profileOpen string
+	profileBusy bool
+	profileErr  string
 }
 
 // loadable is a tab's reading: not yet, under way, done, or failed with a reason.

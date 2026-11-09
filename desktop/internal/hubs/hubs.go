@@ -231,6 +231,8 @@ type Settings struct {
 	NoShortcut bool `json:"no_shortcut,omitempty"`
 	// NoNotifications turns the app's notifications off.
 	NoNotifications bool `json:"no_notifications,omitempty"`
+	// Appearance is "light" or "dark", or "" to follow the system.
+	Appearance string `json:"appearance,omitempty"`
 	// DeviceID names this install to the hub (client_hello device_id); made once.
 	DeviceID string `json:"device_id,omitempty"`
 }

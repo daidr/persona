@@ -98,7 +98,7 @@ func TestParseAddresses(t *testing.T) {
 	if len(got) != 3 || got[0].Name != "Lucy Wang" || got[0].Email != "lucy@example.com" || got[2].Email != "ann@example.com" {
 		t.Fatalf("%+v", got)
 	}
-	if bad := hubapi.BadAddresses("a@b.co, nope"); len(bad) != 1 || bad[0] != "nope" {
+	if bad := hubapi.BadAddresses("ann@example.com, nope"); len(bad) != 1 || bad[0] != "nope" {
 		t.Fatalf("bad: %v", bad)
 	}
 	if s := hubapi.HTMLText("<style>x{}</style><p>Hi&nbsp;there</p><p>Two<br>lines &amp; more</p>"); s != "Hi there\nTwo\nlines & more" {

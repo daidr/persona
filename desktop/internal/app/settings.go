@@ -1,8 +1,15 @@
 package app
 
 import (
+	"errors"
+
 	"github.com/egoist/mygo/ui"
+
+	"github.com/nwverse/persona/desktop/internal/hubapi"
 )
+
+// asHubError finds the hub's answer in err.
+func asHubError(err error, out **hubapi.Error) bool { return err != nil && errors.As(err, out) }
 
 // settingsView is Settings: this app's own (General) and the hub's devices, extensions, connectors and models,
 // each read when first shown.
@@ -12,20 +19,28 @@ func (a *App) settingsView(c *ui.Context, p palette) {
 		*g = settingsPage{conn: a.conn, tab: g.tab}
 	}
 	a.pageHeader(c, p, a.tr("goSettings"), "", func() {
-		ui.Segmented(c.Key("settings-tab"), &g.tab, a.tr("settingsGeneral"), a.tr("settingsDevices"), a.tr("settingsExtensions"),
-			a.tr("settingsConnectors"), a.tr("settingsModels"))
+		ui.Segmented(c.Key("settings-tab"), &g.tab, a.tr("settingsGeneral"), "Persona", a.tr("settingsAgents"), a.tr("settingsDevices"),
+			a.tr("settingsExtensions"), a.tr("settingsConnectors"), a.tr("settingsModels"))
 	})
 	ui.Divider(c)
 	ui.Scroll(c.Key("settings-" + itoa(g.tab))).Grow(1).Children(func() {
 		ui.Column(c).MaxWidth(720).Padding(16, pagePad, 32, pagePad).Gap(16).Children(func() {
 			switch g.tab {
 			case 1:
-				a.devicesView(c, p)
+				a.personaSettings(c, p)
 			case 2:
-				a.extensionsView(c, p)
+				a.agentsSettings(c, p)
 			case 3:
-				a.connectorsView(c, p)
+				a.devicesView(c, p)
 			case 4:
+				a.extensionsView(c, p)
+			case 5:
+				a.connectorsView(c, p)
+			case modelsTab:
+				if !g.models.asked {
+					a.loadProfiles()
+				}
+				a.profilesGroup(c, p)
 				a.modelsView(c, p)
 			default:
 				a.generalSettings(c, p)
@@ -51,6 +66,7 @@ func (a *App) generalSettings(c *ui.Context, p palette) {
 	})
 	a.card(c, p, func() {
 		ui.Text(c, a.tr("appHeading")).Bold()
+		a.appearanceRow(c, p)
 		notify := !s.NoNotifications
 		if a.switchRow(c, p, a.tr("settingNotifications"), a.tr("settingNotificationsHint"), &notify) {
 			s.NoNotifications = !notify

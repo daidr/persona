@@ -43,16 +43,40 @@ const (
 )
 
 func (a *App) colors(c *ui.Context) palette {
-	if c.Theme().Dark {
+	if a.dark(c) {
 		return dark
 	}
 	return light
+}
+
+func (a *App) appearance() string {
+	if a.Hubs == nil {
+		return ""
+	}
+	return a.Hubs.Settings.Appearance
+}
+
+// dark tells the dark palette: chosen in Settings, or the system's.
+func (a *App) dark(c *ui.Context) bool {
+	switch a.appearance() {
+	case "light":
+		return false
+	case "dark":
+		return true
+	}
+	return c.Theme().Dark
 }
 
 // theme sets the window's theme from the palette, following the system's light or dark.
 func (a *App) theme(c *ui.Context) palette {
 	p := a.colors(c)
 	t := *c.Theme()
+	switch a.appearance() {
+	case "light":
+		t = *ui.LightTheme()
+	case "dark":
+		t = *ui.DarkTheme()
+	}
 	t.Background, t.Surface, t.SurfaceHover = p.page, p.surface, p.hover
 	t.Border, t.Text, t.TextMuted = p.line, p.ink, p.ink2
 	t.Accent, t.Danger, t.Success, t.Warning = p.accent, p.red, p.green, p.orange

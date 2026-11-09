@@ -105,7 +105,7 @@ func (a *App) runReadiness(id string) {
 	case "add_computer", "confirm_computer", "wake_computer", "install_claude", "login_claude":
 		a.Navigate("/machines")
 	case "connect_model", "edit_provider":
-		a.sets.tab = 4
+		a.sets.tab = modelsTab
 		a.Navigate("/settings")
 	case "test_assistant":
 		a.readReadiness(true)
