@@ -325,6 +325,7 @@ private fun ChatPage(
             photos.id.takeIf { photos is ChatLine.UserImages && user.id in contentUserImages }
         }.toSet()
     }
+    val contentSourceLabels = remember(lines) { sourceLabelIds(lines.asReversed()) }
     val contentWorkGroups = remember(lines) { lines.filterIsInstance<ChatLine.Work>().associateBy { it.id } }
     // Each open work line's plan card (web #1990 draws only the latest plan of an exchange).
     val contentPlans = remember(contentWorkGroups) { contentWorkGroups.filterValues { it.open }.mapValues { latestPlan(it.value.steps) } }
@@ -723,9 +724,11 @@ private fun ChatPage(
                                                 uncertain = uncertain - interaction.id
                                                 interactionFeedback = result.notice(res, interaction, resolution)
                                                 if (result.offersNext(resolution)) answeredHere++
-                                            } else uncertain = uncertain + interaction.id
-                                            notice = if (result.submission == InteractionSubmission.Unknown) res.getString(result.submission.notice) else null
-                                            if (result.submission == InteractionSubmission.PromptChanged || result.submission == InteractionSubmission.Unknown) {
+                                            } else if (result.submission == InteractionSubmission.Unknown) uncertain = uncertain + interaction.id
+                                            // refused: nothing was done, so the card stays answerable, with the hub's reason (#1881)
+                                            else uncertain = uncertain - interaction.id
+                                            notice = if (result.withdraw) null else result.notice(res, interaction, resolution)
+                                            if (result.submission == InteractionSubmission.PromptChanged || !result.withdraw) {
                                                 try { interactions.refresh() } catch (e: CancellationException) { throw e } catch (_: Exception) { }
                                             }
                                         } finally { busyId = null }
@@ -855,7 +858,8 @@ private fun ChatPage(
                                         lastWorkStep = (line as? ChatLine.Step)?.let {
                                             contentWorkGroups[it.groupId]?.steps?.lastOrNull()?.id == it.step.id
                                         } == true,
-                                        plan = (line as? ChatLine.Step)?.let { contentPlans[it.groupId] })
+                                        plan = (line as? ChatLine.Step)?.let { contentPlans[it.groupId] },
+                                        showSourceLabel = line.id in contentSourceLabels)
                                         }
                                     }
                                 }
