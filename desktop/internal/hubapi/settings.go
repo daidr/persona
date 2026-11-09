@@ -110,6 +110,8 @@ type Connector struct {
 	Guide    []string `json:"guide,omitempty"`
 	LastSync string   `json:"last_sync,omitempty"`
 	Enabled  *bool    `json:"enabled,omitempty"`
+	// Capabilities has "login" for a connector signed in to here, a step at a time.
+	Capabilities []string `json:"capabilities,omitempty"`
 }
 
 // On tells a switched-on connector; one from a hub without the switch is always on.

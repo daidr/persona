@@ -20,6 +20,7 @@ type settingsPage struct {
 	conn *conn
 	tab  int
 	m7   more7
+	m8   more8
 
 	devices    loadable
 	tokens     []hubapi.DeviceToken
@@ -476,9 +477,23 @@ func (a *App) extensionsView(c *ui.Context, p palette) {
 		list, root, err := cl.Extensions(ctx)
 		return func() { g.exts, g.extRoot = list, root }, err
 	})
+	switch {
+	case g.m8.ext != "":
+		a.extensionView(c, p)
+		return
+	case g.m8.mkt:
+		a.marketView(c, p)
+		return
+	}
 	if !a.loadState(c, p, &g.extensions) {
 		return
 	}
+	ui.Row(c).Children(func() {
+		ui.Spacer(c)
+		if ui.Button(c, a.tr("extBrowseMarket")).Clicked() {
+			g.m8.mkt = true
+		}
+	})
 	a.card(c, p, func() {
 		ui.Text(c, a.tr("extensionsTitle", "count", itoa(len(g.exts)))).Bold()
 		ui.Text(c, a.tr("extensionsFooter")).FontSize(small).TextColor(p.ink2)
@@ -541,6 +556,9 @@ func (a *App) extensionRow(c *ui.Context, p palette, x hubapi.Extension) {
 				ui.Text(c, x.Error).FontSize(small).TextColor(p.red).MaxLines(3).Selectable()
 			}
 		})
+		if x.Manager == "" && ui.Button(c, a.tr("extOpen")).FontSize(small).Padding(2, 8).Clicked() {
+			a.openExtension(x.ID)
+		}
 		on := x.On()
 		if ui.Switch(c, &on).Label(a.tr("extSwitch", "name", x.Name)).Disabled(g.extensions.busyOn != "").Changed() {
 			id, root := x.ID, g.extRoot
@@ -627,6 +645,7 @@ func (a *App) connectorRow(c *ui.Context, p palette, x hubapi.Connector, now tim
 			for _, step := range x.Guide {
 				ui.Text(c, "· "+step).FontSize(small).TextColor(p.ink2)
 			}
+			a.connectorSignIn(c, p, x)
 		})
 		if x.Enabled == nil {
 			return // a hub from before the switch: always on
@@ -643,8 +662,8 @@ func (a *App) connectorRow(c *ui.Context, p palette, x hubapi.Connector, now tim
 }
 
 func joinDot(a, b string) string {
-	if a == "" {
-		return b
+	if a == "" || b == "" {
+		return a + b
 	}
 	return a + " · " + b
 }

@@ -36,11 +36,13 @@ func (a *App) settingsView(c *ui.Context, p palette) {
 				case 5:
 					a.mailAccountsGroup(c, p)
 					a.connectorsView(c, p)
+					a.connectorDialogs(c, p)
 				case modelsTab:
 					if !g.models.asked {
 						a.loadProfiles()
 					}
 					a.profilesGroup(c, p)
+					a.providersGroup(c, p)
 					a.modelsView(c, p)
 				case channelsTab:
 					a.channelsView(c, p)
