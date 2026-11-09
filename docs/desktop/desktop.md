@@ -7,7 +7,7 @@ OpenGL), not a webview: the app talks to the hub's HTTP and WebSocket API itself
 
 ## What it has
 
-The work goes in stages toward the web app's features. What it has so far:
+It covers the web app's everyday features:
 
 | | |
 | --- | --- |
