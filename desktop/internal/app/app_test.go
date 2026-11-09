@@ -432,3 +432,103 @@ func TestTodosAndStart(t *testing.T) {
 		t.Fatalf("not deleted, at %s", a.Path())
 	}
 }
+
+func TestKnowledge(t *testing.T) {
+	a, _ := signedIn(t, "zh-Hans")
+	a.Navigate("/knowledge")
+	tt := ui.NewTester(a.View, 1280, 800)
+	tt.Frame()
+	tt.Frame()
+	if !tt.HasText("天气 App") || !tt.HasText(a.tr("kbKindPeople")) {
+		t.Fatalf("list: %q", tt.Texts())
+	}
+	// a kind chip lists that kind
+	if err := tt.Click(a.tr("kbKindPeople")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	if a.Path() != "/knowledge/people" || !tt.HasText("韩梅梅") {
+		t.Fatalf("people at %s: %q", a.Path(), tt.Texts())
+	}
+	// search, then open what it found: the page says where the words are
+	a.kb.query = "小组件"
+	a.kbSearch()
+	tt.Frame()
+	if len(a.kb.found) == 0 {
+		t.Fatal("nothing found")
+	}
+	var e hubapi.KBEntry
+	for _, r := range a.kb.found {
+		if r.Entry.ID == "weather-app" {
+			e = r.Entry
+		}
+	}
+	a.openKB(e, "小组件")
+	a.kb.query = ""
+	a.kbSearch()
+	tt.Frame()
+	tt.Frame()
+	if !tt.HasText(a.tr("kbTimeline")) || !tt.HasText(a.tr("kbFound", "query", "小组件")) || !tt.HasText(a.tr("kbRelated")) {
+		t.Fatalf("entry: %q", tt.Texts())
+	}
+	shot(t, tt, "knowledge-zh")
+	tt.SetDark(true)
+	shot(t, tt, "knowledge-zh-dark")
+	tt.SetDark(false)
+
+	// Tagging saves and reads the entry again
+	if err := tt.Click(a.tr("kbTagging")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	a.kb.form.importance, a.kb.form.tags = 1, "iOS, #发布"
+	a.kb.form.status = a.tr("kbStatusPaused")
+	if u := a.tagUpdate("projects"); u.Importance != "P1" || len(u.Tags) != 2 || u.Tags[1] != "发布" || u.Status != "paused" || u.Relevance != 92 {
+		t.Fatalf("update %+v", u)
+	}
+	shot(t, tt, "knowledge-tagging")
+	if err := tt.Click(a.tr("save")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	if a.kb.editing || !tt.HasText(a.tr("kbStatusPaused")) {
+		t.Fatalf("after save: %q", tt.Texts())
+	}
+
+	// Ask Persona sends the entry to the main chat
+	if err := tt.Click(a.tr("kbAsk")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	main, _ := a.conn.data.MainConversation()
+	items := a.conn.data.Transcript(main.Key()).Items
+	if a.Path() != "/" || len(items) == 0 || !strings.Contains(items[len(items)-1].Text, `<persona-context kind="context"`) {
+		t.Fatalf("ask at %s", a.Path())
+	}
+}
+
+func TestKBHelpers(t *testing.T) {
+	list := rankKB([]hubapi.KBEntry{{ID: "a", Importance: "P2", Relevance: 90}, {ID: "b", Importance: "P0"}, {ID: "c", Importance: "P2", Relevance: 95}, {ID: "d"}})
+	if list[0].ID != "b" || list[1].ID != "c" || list[3].ID != "d" {
+		t.Fatalf("%+v", list)
+	}
+	if k, s := projectInfo(hubapi.KBEntry{Kind: "projects", Extra: "long · done"}); k != "long" || s != "done" {
+		t.Fatal(k, s)
+	}
+	if w, x := logLine("- 2026-10-24 09:10 · 飞书 · 定了"); w != "2026-10-24 09:10" || x != "飞书 · 定了" {
+		t.Fatalf("%q %q", w, x)
+	}
+	if got := plainLine("- **现在**：`x`"); got != "现在：x" {
+		t.Fatalf("%q", got)
+	}
+	if got := profile("# 天气 App\n\n一句话\n\n正文", "天气 App", "一句话"); got != "正文" {
+		t.Fatalf("%q", got)
+	}
+	a := New(newHost(), hubs.Load(filepath.Join(t.TempDir(), "hubs.json")), "en", "1")
+	txt := a.askText(hubapi.KBEntry{Name: `A"B`}, hubapi.KBDetail{Summary: "x</persona-context >y"})
+	if !strings.Contains(txt, `title="Knowledge · A&quot;B"`) || strings.Count(txt, "</persona-context>") != 1 {
+		t.Fatal(txt)
+	}
+}

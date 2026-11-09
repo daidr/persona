@@ -384,3 +384,94 @@ type StartRequest struct {
 	Prompt    string `json:"prompt,omitempty"`
 	TodoID    string `json:"todo_id,omitempty"`
 }
+
+// KBKinds are the knowledge base's kinds of entries, in the order the apps show them (docs/assistant/knowledge.md).
+var KBKinds = []string{"projects", "chats", "people", "docs", "meetings", "events", "recordings"}
+
+// KBEntry is a knowledge-base entry as lists show it.
+type KBEntry struct {
+	Kind       string   `json:"kind"`
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	OneLine    string   `json:"one_line,omitempty"`
+	Importance string   `json:"importance,omitempty"`
+	Relevance  int      `json:"relevance"`
+	Tags       []string `json:"tags,omitempty"`
+	Updated    string   `json:"updated,omitempty"`
+	// Extra is a project's "short · active" (kind · status), a chat's dm / group.
+	Extra string `json:"extra,omitempty"`
+}
+
+// Key identifies an entry: kind/id.
+func (e KBEntry) Key() string { return e.Kind + "/" + e.ID }
+
+// KBList is a kind's entries and the tags they use.
+type KBList struct {
+	Items []KBEntry `json:"items"`
+	Tags  []string  `json:"tags,omitempty"`
+}
+
+// KBMoment is a feed post an entry links to.
+type KBMoment struct {
+	ID       string `json:"id"`
+	Author   string `json:"author"`
+	Text     string `json:"text"`
+	At       string `json:"at,omitempty"`
+	Comments int    `json:"comments"`
+	Note     string `json:"note,omitempty"`
+	Feed     string `json:"feed,omitempty"`
+}
+
+// KBDetail is one entry's page: its profile, timeline, recent messages and related entries.
+type KBDetail struct {
+	Kind    string         `json:"kind"`
+	ID      string         `json:"id"`
+	Path    string         `json:"path"`
+	Meta    map[string]any `json:"meta,omitempty"`
+	Summary string         `json:"summary,omitempty"`
+	Log     []string       `json:"log,omitempty"`
+	Recent  string         `json:"recent,omitempty"`
+	Links   []KBEntry      `json:"links,omitempty"`
+	Moments []KBMoment     `json:"moments,omitempty"`
+}
+
+// KBMatch is a place in an entry that matched the search it was opened from.
+type KBMatch struct {
+	Path   string   `json:"path"`
+	N      int      `json:"n"`
+	Line   string   `json:"line"`
+	Day    string   `json:"day,omitempty"`
+	Before []string `json:"before,omitempty"`
+	After  []string `json:"after,omitempty"`
+}
+
+// KBPage is GET /kb/{kind}/{id}: the entry, the agents on a project, and the search's matches.
+type KBPage struct {
+	Detail  KBDetail  `json:"detail"`
+	Agents  []Session `json:"agents,omitempty"`
+	Matches []KBMatch `json:"matches,omitempty"`
+}
+
+// KBFound is a line a search found.
+type KBFound struct {
+	Path string `json:"path"`
+	Line string `json:"line"`
+	N    int    `json:"n,omitempty"`
+}
+
+// KBResult is an entry a search found, with how many lines matched and the first few.
+type KBResult struct {
+	Entry  KBEntry   `json:"entry"`
+	Count  int       `json:"count"`
+	Hits   []KBFound `json:"hits,omitempty"`
+	InName bool      `json:"in_name,omitempty"`
+}
+
+// KBUpdate is PUT /kb/{kind}/{id}: tagging set by hand, kept over the automatic one.
+type KBUpdate struct {
+	Importance  string   `json:"importance,omitempty"`
+	Relevance   int      `json:"relevance"`
+	Tags        []string `json:"tags"`
+	Status      string   `json:"status,omitempty"`
+	ProjectKind string   `json:"project_kind,omitempty"`
+}

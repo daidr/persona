@@ -19,15 +19,16 @@ The work goes in stages toward the web app's features. What it has so far:
 | Cards | Answering what an agent waits on, in its chat: permissions (Allow, the "always" choice when the hub offers one, Deny), questions (single and multiple choice), plans (Approve, or Keep planning with what to change), terminal dialogs (their options). MCP forms and typed answers say to use the web app or the phone; a card answered elsewhere goes away. |
 | To-dos | Open and done to-dos, a new one from the field at the top (Enter), Mark done / Reopen, notes, the stage and pull request the hub tracked, the agents on it (each opens its chat), Delete after asking, and Start an agent for it. Read again on the hub's `todos` event. |
 | New agent | From the agents list's + or a to-do: an online computer, a folder (typed, from the folders agents started in lately, or browsed through its subfolders and up), the computer's launcher (its default chosen first) and an optional first message; `POST /api/v1/sessions` (with `todo_id` from a to-do) and its chat opens. |
+| Knowledge | The knowledge base by kind (projects, chats, people, docs, meetings, events, recordings), ranked as the hub ranks it (importance, relevance, last update), filtered by tag, and searched across every kind (`/api/v1/kb-search`). An entry shows its importance, relevance and tags, where the search's words appear, the agents on a project, its profile, timeline, recent messages, posts and related entries (each opens), and its folder. Tagging (importance, relevance, tags, a project's kind and status) is saved with `PUT /api/v1/kb/{kind}/{id}`; Ask Persona sends the entry as context to the main chat, as the web app does. |
 | Inbox | Entries to handle and handled ones, the assistant's summary and why, Mark handled / Reopen, and Open in the connector's app. |
 | Computers | Each computer: online or not, system, processor, memory, agents, Claude Code's version, last seen, errors. |
 | Settings | The hubs (open, remove, add), notifications, open at login, the global shortcut, signing out (which revokes this device on the hub). |
 | Notifications | The hub's `notify` events (needs you, finished, the assistant's alerts), quiet hours honored (`quiet` posts silently), none for the chat already in front; a click opens that chat. |
 | Badge and tray | The needs-you count on the Dock / taskbar icon and the tray icon, with a tray line that opens the agents. Closing the window hides it; the app keeps running in the menu bar / notification area with its connection open. Linux needs `libayatana-appindicator3` for the tray; without it, closing the window quits. |
-| Menus | Settings (⌘, / Ctrl+,), Go (Persona, Agents, To-dos, Inbox, Computers on ⌘1–⌘5 / Ctrl+1–5, Back, Forward), Hub (the hubs, Manage Hubs ⌘⇧H), View (zoom, full screen), Edit and Window. |
+| Menus | Settings (⌘, / Ctrl+,), Go (Persona, Agents, To-dos, Inbox, Knowledge, Computers on ⌘1–⌘6 / Ctrl+1–6, Back, Forward), Hub (the hubs, Manage Hubs ⌘⇧H), View (zoom, full screen), Edit and Window. |
 | The rest | ⌥⌘P / Ctrl+Alt+P shows or hides the window from any app; one instance (a second launch brings the first forward); `persona://pair` links sign in; the window's size and place remembered; open at login. |
 
-Later stages, in the web app's order of use: the knowledge base, an agent's terminal and
+Later stages, in the web app's order of use: an agent's terminal and
 its changes, the assistant's other chats and rich cards, Inbox replies and drafts, MCP forms, images and files in
 messages, the command palette, and the rest of Settings (devices, extensions, connectors, models). Until then those
 are in the web app and the phone apps, which work with the same hub at the same time.

@@ -358,3 +358,39 @@ func (c *Client) Start(ctx context.Context, req StartRequest) (Session, error) {
 	}
 	return out.Session, err
 }
+
+// KB lists a kind of knowledge-base entries, those with tag when it isn't "".
+func (c *Client) KB(ctx context.Context, kind, tag string) (KBList, error) {
+	var out KBList
+	path := "/kb/" + url.PathEscape(kind)
+	if tag != "" {
+		path += "?tag=" + url.QueryEscape(tag)
+	}
+	err := c.Do(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
+// KBEntry reads an entry's page; query, when not "", asks for the places it matched.
+func (c *Client) KBEntry(ctx context.Context, kind, id, query string) (KBPage, error) {
+	var out KBPage
+	path := "/kb/" + url.PathEscape(kind) + "/" + url.PathEscape(id)
+	if query != "" {
+		path += "?q=" + url.QueryEscape(query)
+	}
+	err := c.Do(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
+// KBSearch searches the whole knowledge base.
+func (c *Client) KBSearch(ctx context.Context, query string) ([]KBResult, error) {
+	var out struct {
+		Results []KBResult `json:"results"`
+	}
+	err := c.Do(ctx, http.MethodGet, "/kb-search?results=1&q="+url.QueryEscape(query), nil, &out)
+	return out.Results, err
+}
+
+// KBUpdate saves an entry's tagging.
+func (c *Client) KBUpdate(ctx context.Context, kind, id string, u KBUpdate) error {
+	return c.Do(ctx, http.MethodPut, "/kb/"+url.PathEscape(kind)+"/"+url.PathEscape(id), u, nil)
+}

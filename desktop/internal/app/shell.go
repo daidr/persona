@@ -44,6 +44,15 @@ func (a *App) View(c *ui.Context) {
 				case r.Match("/todos/{id...}"):
 					r.Title(a.tr("goTodos"))
 					a.todosView(c, p, r.Param("id"))
+				case r.Match("/knowledge"):
+					r.Title(a.tr("goKnowledge"))
+					a.knowledgeView(c, p, "", "")
+				case r.Match("/knowledge/{kind}"):
+					r.Title(a.tr("goKnowledge"))
+					a.knowledgeView(c, p, r.Param("kind"), "")
+				case r.Match("/knowledge/{kind}/{id...}"):
+					r.Title(a.tr("goKnowledge"))
+					a.knowledgeView(c, p, r.Param("kind"), r.Param("id"))
 				case r.Match("/machines"):
 					r.Title(a.tr("goMachines"))
 					a.machinesView(c, p)
@@ -61,7 +70,7 @@ func (a *App) View(c *ui.Context) {
 
 // section is the sidebar item a path belongs to.
 func section(path string) string {
-	for _, s := range []string{"/agents", "/todos", "/inbox", "/machines", "/settings"} {
+	for _, s := range []string{"/agents", "/todos", "/inbox", "/knowledge", "/machines", "/settings"} {
 		if path == s || len(path) > len(s) && path[:len(s)+1] == s+"/" {
 			return s
 		}
@@ -94,6 +103,7 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 					ui.Badge(c, itoa(n))
 				}
 			})
+			ui.SidebarItem(c, "/knowledge", icon("book"), a.tr("goKnowledge"))
 			ui.SidebarItem(c, "/machines", icon("machine"), a.tr("goMachines"))
 			ui.SidebarItem(c, "/settings", icon("gear"), a.tr("goSettings"))
 		}).Grow(1).Background(p.inset).OnChange(func() { a.Navigate(page) })

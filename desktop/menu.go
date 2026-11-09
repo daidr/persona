@@ -28,7 +28,8 @@ var pages = []struct{ key, path, accel string }{
 	{"goAgents", "/agents", "CmdOrCtrl+2"},
 	{"goTodos", "/todos", "CmdOrCtrl+3"},
 	{"goInbox", "/inbox", "CmdOrCtrl+4"},
-	{"goMachines", "/machines", "CmdOrCtrl+5"},
+	{"goKnowledge", "/knowledge", "CmdOrCtrl+5"},
+	{"goMachines", "/machines", "CmdOrCtrl+6"},
 }
 
 // refreshMenus sets the app menu and the tray menu again, after the hubs, the badge or a setting changed.

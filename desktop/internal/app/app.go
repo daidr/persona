@@ -72,6 +72,7 @@ type App struct {
 	inbox   inboxPage
 	sets    settingsPage
 	todos   todosPage
+	kb      kbPage
 	start   startForm
 	badge   int
 	toasts  []string
