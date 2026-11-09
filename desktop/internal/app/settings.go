@@ -29,6 +29,7 @@ func (a *App) settingsView(c *ui.Context, p palette) {
 					a.personaSettings(c, p)
 				case 2:
 					a.agentsSettings(c, p)
+					a.boardSettingGroup(c, p)
 				case 3:
 					a.devicesView(c, p)
 				case 4:

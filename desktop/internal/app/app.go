@@ -78,6 +78,9 @@ type App struct {
 	agents   agentsPage
 	archived archivedPage
 	usage    usageState
+	health   healthState
+	msgs     messagesState
+	board    boardState
 	palette  paletteState
 	chats    map[string]*chatState
 	// images are the chats' pictures, decoded, by item id.
@@ -304,6 +307,7 @@ func (a *App) open(h hubs.Hub, token string) {
 	a.conn = c
 	a.chats = map[string]*chatState{}
 	a.archived, a.usage = archivedPage{}, usageState{}
+	a.health, a.msgs, a.board = healthState{}, messagesState{}, boardState{}
 	a.refresh(c)
 	a.RunSocket(ctx, c.socket)
 }

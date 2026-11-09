@@ -65,6 +65,21 @@ func (a *App) View(c *ui.Context) {
 				case r.Match("/knowledge/{kind}/{id...}"):
 					r.Title(a.tr("goKnowledge"))
 					a.knowledgeView(c, p, r.Param("kind"), r.Param("id"))
+				case r.Match("/health"):
+					r.Title(a.tr("healthTitle"))
+					a.healthView(c, p, "")
+				case r.Match("/health/{id...}"):
+					r.Title(a.tr("healthTitle"))
+					a.healthView(c, p, r.Param("id"))
+				case r.Match("/messages"):
+					r.Title(a.tr("msgTitle"))
+					a.messagesView(c, p, "")
+				case r.Match("/messages/{id...}"):
+					r.Title(a.tr("msgTitle"))
+					a.messagesView(c, p, r.Param("id"))
+				case r.Match("/board"):
+					r.Title(a.tr("wbTitle"))
+					a.boardView(c, p)
 				case r.Match("/machines"):
 					r.Title(a.tr("goMachines"))
 					a.machinesView(c, p)
@@ -84,7 +99,7 @@ func (a *App) View(c *ui.Context) {
 
 // section is the sidebar item a path belongs to.
 func section(path string) string {
-	for _, s := range []string{"/overview", "/routines", "/agents", "/todos", "/inbox", "/knowledge", "/machines", "/settings"} {
+	for _, s := range []string{"/overview", "/routines", "/agents", "/todos", "/inbox", "/messages", "/health", "/board", "/knowledge", "/machines", "/settings"} {
 		if path == s || len(path) > len(s) && path[:len(s)+1] == s+"/" {
 			return s
 		}
@@ -99,6 +114,7 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 			ui.Icon(c, icon("hub")).FontSize(16).TextColor(p.ink2)
 			ui.Text(c, a.HubTitle()).Bold().FontSize(heading).SingleLine().Grow(1)
 		})
+		a.readBoardSetting()
 		page := section(a.router.Path())
 		ui.Sidebar(c, &page, func() {
 			ui.SidebarItem(c, "/", icon("home"), a.tr("goPersona"))
@@ -118,6 +134,13 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 					ui.Badge(c, itoa(n))
 				}
 			})
+			if a.larkOn() {
+				ui.SidebarItem(c, "/messages", icon("chat"), a.tr("msgTitle"))
+			}
+			if a.board.setting.Enabled {
+				ui.SidebarItem(c, "/board", icon("layers"), a.tr("wbTitle"))
+			}
+			ui.SidebarItem(c, "/health", icon("heart"), a.tr("healthTitle"))
 			ui.SidebarItem(c, "/routines", icon("clock"), a.tr("goRoutines"))
 			ui.SidebarItem(c, "/knowledge", icon("book"), a.tr("goKnowledge"))
 			ui.SidebarItem(c, "/machines", icon("machine"), a.tr("goMachines"))
