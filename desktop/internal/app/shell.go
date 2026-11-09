@@ -29,6 +29,12 @@ func (a *App) View(c *ui.Context) {
 				case r.Match("/persona/{id...}"):
 					r.Title(a.tr("goPersona"))
 					a.personaPage(c, p, r.Param("id"))
+				case r.Match("/overview"):
+					r.Title(a.tr("goOverview"))
+					a.overviewView(c, p)
+				case r.Match("/routines"):
+					r.Title(a.tr("goRoutines"))
+					a.routinesView(c, p)
 				case r.Match("/agents"):
 					r.Title(a.tr("goAgents"))
 					a.agentsView(c, p, "")
@@ -69,12 +75,13 @@ func (a *App) View(c *ui.Context) {
 		})
 	})
 	a.startView(c, p)
+	a.agentDialog(c, p)
 	a.paletteView(c, p)
 }
 
 // section is the sidebar item a path belongs to.
 func section(path string) string {
-	for _, s := range []string{"/agents", "/todos", "/inbox", "/knowledge", "/machines", "/settings"} {
+	for _, s := range []string{"/overview", "/routines", "/agents", "/todos", "/inbox", "/knowledge", "/machines", "/settings"} {
 		if path == s || len(path) > len(s) && path[:len(s)+1] == s+"/" {
 			return s
 		}
@@ -92,6 +99,7 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 		page := section(a.router.Path())
 		ui.Sidebar(c, &page, func() {
 			ui.SidebarItem(c, "/", icon("home"), a.tr("goPersona"))
+			ui.SidebarItem(c, "/overview", icon("grid"), a.tr("goOverview"))
 			ui.SidebarItem(c, "/agents", icon("agent"), a.tr("goAgents")).Children(func() {
 				if n := d.NeedsYou(); n > 0 {
 					ui.Badge(c, itoa(n))
@@ -107,6 +115,7 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 					ui.Badge(c, itoa(n))
 				}
 			})
+			ui.SidebarItem(c, "/routines", icon("clock"), a.tr("goRoutines"))
 			ui.SidebarItem(c, "/knowledge", icon("book"), a.tr("goKnowledge"))
 			ui.SidebarItem(c, "/machines", icon("machine"), a.tr("goMachines"))
 			ui.SidebarItem(c, "/settings", icon("gear"), a.tr("goSettings"))

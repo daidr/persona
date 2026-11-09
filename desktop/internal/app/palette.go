@@ -45,7 +45,7 @@ func (a *App) commands() []command {
 	add("new-agent", "plus", a.tr("startTitle"), a.tr("paletteAction"), func() { a.openStart("", "") })
 	add("new-chat", "spark", a.tr("personaNew"), a.tr("paletteAction"), func() { a.Navigate("/persona/new") })
 	for _, pg := range []struct{ key, ic, path string }{
-		{"goPersona", "home", "/"}, {"goAgents", "agent", "/agents"}, {"goTodos", "todo", "/todos"}, {"goInbox", "inbox", "/inbox"},
+		{"goPersona", "home", "/"}, {"goOverview", "grid", "/overview"}, {"goAgents", "agent", "/agents"}, {"goTodos", "todo", "/todos"}, {"goInbox", "inbox", "/inbox"}, {"goRoutines", "clock", "/routines"},
 		{"goKnowledge", "book", "/knowledge"}, {"goMachines", "machine", "/machines"}, {"goSettings", "gear", "/settings"},
 	} {
 		path := pg.path

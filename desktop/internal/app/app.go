@@ -76,18 +76,20 @@ type App struct {
 	palette paletteState
 	chats   map[string]*chatState
 	// images are the chats' pictures, decoded, by item id.
-	images  map[string]ui.ImageSource
-	inbox   inboxPage
-	sets    settingsPage
-	todos   todosPage
-	kb      kbPage
-	terms   map[string]*termState
-	gits    map[string]*changesState
-	cards   map[string]*cardState
-	persona personaState
-	start   startForm
-	badge   int
-	toasts  []string
+	images   map[string]ui.ImageSource
+	inbox    inboxPage
+	sets     settingsPage
+	routines routinesPage
+	act      agentAction
+	todos    todosPage
+	kb       kbPage
+	terms    map[string]*termState
+	gits     map[string]*changesState
+	cards    map[string]*cardState
+	persona  personaState
+	start    startForm
+	badge    int
+	toasts   []string
 }
 
 // conn is the live connection to the hub shown.
@@ -337,6 +339,7 @@ func (a *App) refresh(c *conn) {
 		as, _ := c.client.Assistant(ctx)
 		inbox, inboxErr := c.client.Inbox(ctx)
 		todos, todosErr := c.client.Todos(ctx)
+		pins, pinsErr := c.client.Pins(ctx)
 		a.Host.Post(func() {
 			if !a.live(c) {
 				return
@@ -352,6 +355,9 @@ func (a *App) refresh(c *conn) {
 			}
 			if todosErr == nil {
 				c.data.SetTodos(todos)
+			}
+			if pinsErr == nil {
+				c.data.Pins, c.data.PinsLoaded = pins, true
 			}
 			c.loaded, c.err = true, ""
 			a.updateBadge()
@@ -441,6 +447,9 @@ func (a *App) apply(c *conn, ev hubapi.Event) {
 	}
 	if fx.Todos && ev.Type != "hello" {
 		a.refreshTodos(c)
+	}
+	if fx.Schedule {
+		a.routines.load.asked = false
 	}
 	if fx.Notify != nil {
 		a.notify(c, *fx.Notify)

@@ -198,6 +198,7 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 					ui.Box(c).Size(7, 7).Radius(4).Background(p.stateColor(state))
 					ui.Text(c, a.stateLabel(state)).FontSize(small).TextColor(p.ink2).SingleLine()
 				})
+				a.agentMenu(c, p, x, false)
 			}
 		})
 		ui.Divider(c)

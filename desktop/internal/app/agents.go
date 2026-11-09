@@ -20,6 +20,7 @@ type agentRow struct {
 	heading string
 	state   string
 	agent   hubapi.Session
+	pinned  bool
 }
 
 func (a *App) stateLabel(state string) string {
@@ -63,7 +64,21 @@ func (a *App) agentsList(c *ui.Context, p palette, open string) {
 	})
 	ui.SearchField(c.Key("agents-search"), &g.query).Placeholder(a.tr("agentsSearch")).Margin(0, 16, 8, 16)
 	g.rows = g.rows[:0]
-	for _, grp := range d.Agents(g.query) {
+	groups := d.Agents(g.query)
+	// pinned agents come first, in their own group, and stay in their state's too
+	var pinned []agentRow
+	for _, grp := range groups {
+		for _, x := range grp.Agents {
+			if d.Pinned(x.Key()) {
+				pinned = append(pinned, agentRow{agent: x, state: grp.State, pinned: true})
+			}
+		}
+	}
+	if len(pinned) > 0 {
+		g.rows = append(g.rows, agentRow{heading: a.tr("agentsPinned"), state: "pinned"})
+		g.rows = append(g.rows, pinned...)
+	}
+	for _, grp := range groups {
 		g.rows = append(g.rows, agentRow{heading: a.stateLabel(grp.State), state: grp.State})
 		for _, x := range grp.Agents {
 			g.rows = append(g.rows, agentRow{agent: x, state: grp.State})
@@ -74,6 +89,9 @@ func (a *App) agentsList(c *ui.Context, p palette, open string) {
 		if rows[i].heading != "" {
 			return "h:" + rows[i].state
 		}
+		if rows[i].pinned {
+			return "p:" + rows[i].agent.Key()
+		}
 		return rows[i].agent.Key()
 	}
 	g.list.Header = func(i int) bool { return rows[i].heading != "" }
@@ -82,7 +100,11 @@ func (a *App) agentsList(c *ui.Context, p palette, open string) {
 		r := rows[i]
 		if r.heading != "" {
 			ui.Row(c).Padding(10, 16, 4, 16).Background(p.page).Gap(6).Children(func() {
-				ui.Text(c, r.heading).FontSize(small).Bold().TextColor(p.stateColor(r.state))
+				col := p.stateColor(r.state)
+				if r.state == "pinned" {
+					col = p.ink2
+				}
+				ui.Text(c, r.heading).FontSize(small).Bold().TextColor(col)
 			})
 			return
 		}
@@ -106,7 +128,11 @@ func (a *App) agentRowView(c *ui.Context, p palette, d *store.Store, r agentRow,
 	if chosen {
 		bg = p.hover
 	}
-	row := ui.ButtonBase(c.Key(x.Key())).Margin(0, 8).Padding(8, 10).Radius(rowRadius).Background(bg).Gap(10).AlignItems(ui.Start).Label(x.Title)
+	id := x.Key()
+	if r.pinned {
+		id = "p:" + id
+	}
+	row := ui.ButtonBase(c.Key(id)).Margin(0, 8).Padding(8, 10).Radius(rowRadius).Background(bg).Gap(10).AlignItems(ui.Start).Label(x.Title)
 	row.Children(func() {
 		ui.Box(c).Size(8, 8).Radius(4).Background(p.stateColor(r.state)).Margin(6, 0, 0, 0)
 		ui.Column(c).Grow(1).Shrink(1).Gap(2).Children(func() {

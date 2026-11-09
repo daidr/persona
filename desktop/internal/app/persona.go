@@ -15,6 +15,7 @@ import (
 type personaState struct {
 	list         ui.ListState
 	showArchived bool
+	query        string
 	draft        string
 	starting     bool
 }
@@ -70,6 +71,9 @@ func (a *App) personaPage(c *ui.Context, p palette, open string) {
 				a.pageHeader(c, p, title, a.tr("personaSubtitle"), func() {
 					if open != main.SessionID {
 						a.archiveButton(c, open)
+						if x, ok := d.Session(d.Assistant.MachineID + "/" + open); ok {
+							a.agentMenu(c, p, x, true)
+						}
 					}
 				})
 				ui.Divider(c)
@@ -108,6 +112,8 @@ func (a *App) conversationList(c *ui.Context, p palette, open, mainID string) {
 			g.showArchived = tab == 1
 		}
 	}
+	ui.SearchField(c.Key("chats-search"), &g.query).Placeholder(a.tr("personaSearch")).Margin(0, 16, 8, 16)
+	list = matchChats(list, g.query)
 	now := time.Now()
 	g.list.Key = func(i int) any { return list[i].SessionID }
 	ui.List(c, &g.list, len(list), func(i int) {
@@ -250,4 +256,24 @@ func (a *App) startConversation() {
 			a.Navigate("/persona/" + s.SessionID)
 		})
 	})
+}
+
+// matchChats keeps the chats whose title or last line has every word of the query.
+func matchChats(list []hubapi.Session, query string) []hubapi.Session {
+	words := strings.Fields(strings.ToLower(query))
+	if len(words) == 0 {
+		return list
+	}
+	var out []hubapi.Session
+	for _, x := range list {
+		hay := strings.ToLower(x.Title + " " + x.LastText)
+		ok := true
+		for _, w := range words {
+			ok = ok && strings.Contains(hay, w)
+		}
+		if ok {
+			out = append(out, x)
+		}
+	}
+	return out
 }

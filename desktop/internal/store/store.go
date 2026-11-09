@@ -41,7 +41,9 @@ type Effect struct {
 	Inbox     bool
 	Assistant bool
 	Todos     bool
-	Notify    *Notify
+	// Schedule: the scheduled tasks changed.
+	Schedule bool
+	Notify   *Notify
 }
 
 // Store is one hub's state.
@@ -56,6 +58,9 @@ type Store struct {
 	InboxLoaded  bool
 	Todos        []hubapi.Todo
 	TodosLoaded  bool
+	// Pins are the agents and spaces pinned, kept on the hub.
+	Pins       hubapi.Pins
+	PinsLoaded bool
 }
 
 // New is an empty store.
@@ -149,6 +154,8 @@ func (s *Store) Apply(ev hubapi.Event) Effect {
 		fx.Inbox = true
 	case "todos":
 		fx.Todos = true
+	case "assistant_schedule":
+		fx.Schedule = true
 	}
 	return fx
 }
@@ -222,6 +229,15 @@ func (s *Store) PutSession(x hubapi.Session) {
 	}
 	s.Sessions[x.MachineID] = append(list, x)
 }
+
+// DropSession takes an agent out of the lists, until its computer's next list.
+func (s *Store) DropSession(key string) {
+	machine, session, _ := strings.Cut(key, "/")
+	s.Sessions[machine] = slices.DeleteFunc(s.Sessions[machine], func(x hubapi.Session) bool { return x.SessionID == session })
+}
+
+// Pinned says whether an agent is pinned.
+func (s *Store) Pinned(key string) bool { return slices.Contains(s.Pins.Sessions, key) }
 
 // SetInteractions replaces the open cards.
 func (s *Store) SetInteractions(list []hubapi.Interaction) {

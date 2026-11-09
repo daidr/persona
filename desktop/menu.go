@@ -25,11 +25,13 @@ func shortcutLabel() string {
 // pages are the places the Go menu reaches, with their shortcuts.
 var pages = []struct{ key, path, accel string }{
 	{"goPersona", "/", "CmdOrCtrl+1"},
-	{"goAgents", "/agents", "CmdOrCtrl+2"},
-	{"goTodos", "/todos", "CmdOrCtrl+3"},
-	{"goInbox", "/inbox", "CmdOrCtrl+4"},
-	{"goKnowledge", "/knowledge", "CmdOrCtrl+5"},
-	{"goMachines", "/machines", "CmdOrCtrl+6"},
+	{"goOverview", "/overview", "CmdOrCtrl+2"},
+	{"goAgents", "/agents", "CmdOrCtrl+3"},
+	{"goTodos", "/todos", "CmdOrCtrl+4"},
+	{"goInbox", "/inbox", "CmdOrCtrl+5"},
+	{"goRoutines", "/routines", "CmdOrCtrl+6"},
+	{"goKnowledge", "/knowledge", "CmdOrCtrl+7"},
+	{"goMachines", "/machines", "CmdOrCtrl+8"},
 }
 
 // refreshMenus sets the app menu and the tray menu again, after the hubs, the badge or a setting changed.
