@@ -331,7 +331,7 @@ func (a *App) fileView(c *ui.Context, p palette, key string, x hubapi.Session, f
 				ui.Text(c, sizeText(fc.Size)+" · "+f.path).FontSize(11).TextColor(p.ink3).SingleLine()
 			}
 		})
-		if f.loaded && isMD && fc.Text != nil {
+		if f.loaded && (isMD || viewerKind(f.path) == "table" || viewerKind(f.path) == "notebook") && fc.Text != nil {
 			label := a.tr("filesSource")
 			if fs.mdSource {
 				label = a.tr("filesRendered")
@@ -340,13 +340,10 @@ func (a *App) fileView(c *ui.Context, p palette, key string, x hubapi.Session, f
 				fs.mdSource = !fs.mdSource
 			}
 		}
-		if ui.Button(c, a.tr("filesCopyPath")).FontSize(small).Padding(2, 8).Clicked() {
-			c.WriteClipboard(f.path)
-			a.toast(a.tr("filesPathCopied"))
-		}
 		if ui.Button(c, a.tr("filesSave")).FontSize(small).Padding(2, 8).Disabled(fs.saving).Clicked() {
 			a.saveCopy(key, x, f.path)
 		}
+		a.fileMenu(c, p, x, f)
 	})
 	switch {
 	case f.err != "":
@@ -371,6 +368,12 @@ func (a *App) fileView(c *ui.Context, p palette, key string, x hubapi.Session, f
 		return
 	case fc.Text == nil:
 		a.empty(c, p, "read", a.tr("filesNoPreview"), fc.Mime)
+		return
+	case viewerKind(f.path) == "table" && !fs.mdSource:
+		a.tableView(c, p, f)
+		return
+	case viewerKind(f.path) == "notebook" && !fs.mdSource:
+		a.notebookView(c, p, f)
 		return
 	}
 	ui.Scroll(c.Key("text-" + f.path)).Grow(1).Children(func() {

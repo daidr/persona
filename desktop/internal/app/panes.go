@@ -16,6 +16,7 @@ const (
 	paneTerminal
 	paneChanges
 	paneFiles
+	panePreview
 )
 
 // termState is an agent's terminal as last read, and what is being typed into it.
@@ -27,6 +28,14 @@ type termState struct {
 	err     string
 	input   string
 	sending bool
+	// history is the scrollback read above the screen, oldest first; more says there is more of it.
+	history  []string
+	histMore bool
+	histRead bool
+	histBusy bool
+	histErr  string
+	scroll   ui.ScrollState
+	follow   bool
 }
 
 // changesState is the agent's folder's Git status and the diffs read.
@@ -56,7 +65,7 @@ func (a *App) term(key string) *termState {
 	}
 	s := a.terms[key]
 	if s == nil {
-		s = &termState{}
+		s = &termState{follow: true}
 		a.terms[key] = s
 	}
 	return s
@@ -74,7 +83,7 @@ func (a *App) readScreen(key string) {
 	a.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 		defer cancel()
-		scr, err := c.client.Screen(ctx, machine, session, 60)
+		scr, err := c.client.ScreenANSI(ctx, machine, session, 60)
 		a.Host.Post(func() {
 			st.loading, st.read = false, time.Now()
 			if !a.live(c) {
@@ -111,60 +120,6 @@ func (a *App) sendKeys(key, text string, keys ...string) {
 				return
 			}
 			st.read = time.Time{}
-		})
-	})
-}
-
-// terminalPane is the agent's terminal: its screen, read every moment while shown, and a line and keys to type with.
-func (a *App) terminalPane(c *ui.Context, p palette, key string, x hubapi.Session) {
-	st := a.term(key)
-	a.readScreen(key)
-	ui.Scroll(c.Key("term-" + key)).Grow(1).Background(p.inset).Children(func() {
-		ui.Column(c).Padding(12, pagePad).Children(func() {
-			switch {
-			case st.loaded:
-				text := strings.TrimRight(st.screen.Text, "\n ")
-				if text == "" {
-					text = a.tr("terminalBlank")
-				}
-				ui.Text(c, text).Font("monospace").FontSize(small).Selectable()
-			case st.err != "":
-				a.empty(c, p, "warning", st.err, "")
-			default:
-				ui.Spinner(c).Margin(24, ui.Auto)
-			}
-		})
-	})
-	if st.loaded && st.err != "" {
-		ui.Text(c, st.err).FontSize(small).TextColor(p.red).Padding(4, pagePad)
-	}
-	can := x.Can("terminal")
-	ui.Divider(c)
-	ui.Column(c).Padding(10, pagePad, 14, pagePad).Gap(8).Children(func() {
-		ui.Row(c).Gap(8).Children(func() {
-			in := ui.TextInput(c.Key("term-input-"+key), &st.input).Placeholder(a.tr("terminalType")).Label(a.tr("terminalType")).
-				Font("monospace").Grow(1).Disabled(!can)
-			if in.Submitted() && can {
-				a.sendKeys(key, st.input, "enter")
-				st.input = ""
-			}
-			if st.sending {
-				ui.Spinner(c)
-			}
-		})
-		ui.Row(c).Gap(6).Wrap().Children(func() {
-			for _, k := range []struct{ label, name string }{
-				{"Esc", "esc"}, {"Tab", "tab"}, {"⌃C", "ctrl+c"}, {"←", "left"}, {"↑", "up"}, {"↓", "down"}, {"→", "right"}, {"⏎", "enter"},
-			} {
-				if ui.Button(c.Key("key-"+k.name), k.label).Font("monospace").FontSize(small).Padding(3, 10).
-					Label(k.name).Tooltip(k.name).Disabled(!can).Clicked() {
-					a.sendKeys(key, "", k.name)
-				}
-			}
-			ui.Spacer(c)
-			if !can {
-				ui.Text(c, a.tr("terminalReadOnly")).FontSize(small).TextColor(p.ink3)
-			}
 		})
 	})
 }

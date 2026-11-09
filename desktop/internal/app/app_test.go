@@ -73,7 +73,8 @@ func (h *fakeHost) SaveFile(_, _ string, done func(string)) {
 // and whose agents can be archived (MOCK_AGENT_ARCHIVES),
 // which other tests would otherwise share.
 // settingsMockURL is a third whose hub has an update to install (MOCK_HUB_UPDATE), a ledger of what was sent as the user
-// (MOCK_SENT), channels (MOCK_CHANNELS) and model providers that can be tested (MOCK_PROVIDERS).
+// (MOCK_SENT), channels (MOCK_CHANNELS), model providers that can be tested (MOCK_PROVIDERS) and terminal panes to browse
+// (MOCK_TERMINAL_PANES).
 var mockURL, gitMockURL, settingsMockURL string
 
 // TestMain starts the mock hubs, which serve machines, agents, cards and an Inbox shaped as a real hub's, when
@@ -86,7 +87,7 @@ func TestMain(m *testing.M) {
 		stop = append(stop, kill)
 		gitMockURL, kill = startMock(py, "MOCK_GIT_WRITE=1", "MOCK_TASKS=1", "MOCK_GITHUB_INBOX=1", "MOCK_TELEGRAM=signed_in", "MOCK_TELEGRAM_INBOX=1", "MOCK_AGENT_ARCHIVES=1")
 		stop = append(stop, kill)
-		settingsMockURL, kill = startMock(py, "MOCK_HUB_UPDATE=available", "MOCK_SENT=1", "MOCK_CHANNELS=1", "MOCK_PROVIDERS=1")
+		settingsMockURL, kill = startMock(py, "MOCK_HUB_UPDATE=available", "MOCK_SENT=1", "MOCK_CHANNELS=1", "MOCK_PROVIDERS=1", "MOCK_TERMINAL_PANES=1")
 		stop = append(stop, kill)
 	}
 	code := m.Run()

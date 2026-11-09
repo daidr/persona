@@ -80,6 +80,12 @@ func (a *App) View(c *ui.Context) {
 				case r.Match("/board"):
 					r.Title(a.tr("wbTitle"))
 					a.boardView(c, p)
+				case r.Match("/terminal"):
+					r.Title(a.tr("termsTitle"))
+					a.terminalsView(c, p, "")
+				case r.Match("/terminal/{machine}/{id...}"):
+					r.Title(a.tr("termsTitle"))
+					a.terminalsView(c, p, r.Param("machine")+"/"+r.Param("id"))
 				case r.Match("/machines"):
 					r.Title(a.tr("goMachines"))
 					a.machinesView(c, p)
@@ -99,7 +105,7 @@ func (a *App) View(c *ui.Context) {
 
 // section is the sidebar item a path belongs to.
 func section(path string) string {
-	for _, s := range []string{"/overview", "/routines", "/agents", "/todos", "/inbox", "/messages", "/health", "/board", "/knowledge", "/machines", "/settings"} {
+	for _, s := range []string{"/overview", "/routines", "/agents", "/todos", "/inbox", "/messages", "/health", "/board", "/terminal", "/knowledge", "/machines", "/settings"} {
 		if path == s || len(path) > len(s) && path[:len(s)+1] == s+"/" {
 			return s
 		}
@@ -139,6 +145,9 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 			}
 			if a.board.setting.Enabled {
 				ui.SidebarItem(c, "/board", icon("layers"), a.tr("wbTitle"))
+			}
+			if a.panesOn() {
+				ui.SidebarItem(c, "/terminal", icon("terminal"), a.tr("termsTitle"))
 			}
 			ui.SidebarItem(c, "/health", icon("heart"), a.tr("healthTitle"))
 			ui.SidebarItem(c, "/routines", icon("clock"), a.tr("goRoutines"))

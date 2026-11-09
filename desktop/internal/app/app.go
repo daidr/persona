@@ -81,8 +81,12 @@ type App struct {
 	health   healthState
 	msgs     messagesState
 	board    boardState
-	palette  paletteState
-	chats    map[string]*chatState
+	terms10  terminalsState
+	// previews are the agents' dev server previews; previewArea is where the open one was last drawn
+	previews    map[string]*previewState
+	previewArea ui.Rect
+	palette     paletteState
+	chats       map[string]*chatState
 	// images are the chats' pictures, decoded, by item id.
 	images      map[string]ui.ImageSource
 	inbox       inboxPage
@@ -307,7 +311,8 @@ func (a *App) open(h hubs.Hub, token string) {
 	a.conn = c
 	a.chats = map[string]*chatState{}
 	a.archived, a.usage = archivedPage{}, usageState{}
-	a.health, a.msgs, a.board = healthState{}, messagesState{}, boardState{}
+	a.health, a.msgs, a.board, a.terms10 = healthState{}, messagesState{}, boardState{}, terminalsState{}
+	a.closePreviews()
 	a.refresh(c)
 	a.RunSocket(ctx, c.socket)
 }

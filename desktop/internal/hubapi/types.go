@@ -102,7 +102,9 @@ type Session struct {
 	BackgroundWorking bool   `json:"background_working,omitempty"`
 	BackgroundWaiting bool   `json:"background_waiting,omitempty"`
 	Loop              any    `json:"loop,omitempty"`
-	Ports             []any  `json:"ports,omitempty"`
+	Ports             []Port `json:"ports,omitempty"`
+	WorkspaceID       string `json:"workspace_id,omitempty"`
+	SpaceKind         string `json:"space_kind,omitempty"`
 	Quiet             bool   `json:"quiet,omitempty"`
 	Muted             bool   `json:"muted,omitempty"`
 	IsSubagent        bool   `json:"is_subagent,omitempty"`
