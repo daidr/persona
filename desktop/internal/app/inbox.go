@@ -48,6 +48,14 @@ func (a *App) inboxView(c *ui.Context, p palette, open string) {
 		ui.Column(c).Width(listWidth).BorderWidth(0, 1, 0, 0).BorderColor(p.line).Children(func() {
 			ui.Row(c).Padding(16, 16, 8, 16).Children(func() {
 				ui.Text(c, a.tr("goInbox")).FontSize(title).Bold().Grow(1)
+				accounts := a.mailAccounts(false)
+				tip := a.tr("mailNew")
+				if len(accounts) == 0 {
+					tip = a.tr("mailNewNoAccount")
+				}
+				if ui.Button(c, "").Label(tip).Tooltip(tip).Disabled(len(accounts) == 0).Children(func() { ui.Icon(c, icon("compose")) }).Clicked() {
+					a.newMail()
+				}
 			})
 			tab := 0
 			if g.showDone {
@@ -115,6 +123,7 @@ func (a *App) inboxView(c *ui.Context, p palette, open string) {
 			a.empty(c, p, "inbox", a.tr("inboxPick"), "")
 		})
 	})
+	a.composeDialog(c, p)
 }
 
 func inboxTitle(it hubapi.InboxItem) string {
@@ -134,13 +143,17 @@ func (a *App) inboxDetail(c *ui.Context, p palette, it hubapi.InboxItem) {
 	}
 	busy := a.inbox.busy[it.ID]
 	a.pageHeader(c, p, inboxTitle(it), sub, func() {
-		if it.Connector != nil && it.Connector.URL != "" {
+		if it.Connector != nil && (it.Connector.URL != "" || it.Connector.Web != "") {
 			app := it.AccountName
 			if app == "" {
 				app = it.Source
 			}
 			if ui.Button(c, a.tr("openIn", "app", app)).Clicked() {
-				a.Host.OpenURL(it.Connector.URL)
+				if it.Connector.URL != "" {
+					a.Host.OpenURL(it.Connector.URL)
+				} else {
+					a.Host.OpenURL(it.Connector.Web)
+				}
 			}
 		}
 		label := a.tr("markDone")
@@ -165,7 +178,12 @@ func (a *App) inboxDetail(c *ui.Context, p palette, it hubapi.InboxItem) {
 				}
 			})
 		}
-		if it.Preview != "" {
+		switch {
+		case it.Mail != nil && it.Mail.UID() > 0:
+			a.mailView(c, p, it)
+		case it.Connector != nil && it.Connector.Thread != "":
+			a.threadView(c, p, it)
+		case it.Preview != "":
 			ui.Text(c, it.Preview).Selectable()
 		}
 		if it.Count > 1 {
@@ -184,8 +202,10 @@ func (a *App) replyCard(c *ui.Context, p palette, it hubapi.InboxItem) {
 	if g.replyFor != it.ID {
 		g.replyFor, g.reply, g.ask = it.ID, it.Drafted(), ""
 	}
+	// a connector's thread has its own box to answer in
+	canReply := it.CanReply() && (it.Connector == nil || it.Connector.Thread == "")
 	a.card(c, p, func() {
-		if it.CanReply() {
+		if canReply {
 			ui.Text(c, a.tr("inboxReply")).Bold()
 			if d := it.Drafted(); d != "" {
 				ui.Row(c).Gap(6).Children(func() {
@@ -215,7 +235,7 @@ func (a *App) replyCard(c *ui.Context, p palette, it hubapi.InboxItem) {
 				a.ignoreInbox(it)
 			}
 			ui.Spacer(c)
-			if it.CanReply() {
+			if canReply {
 				if g.sending {
 					ui.Spinner(c)
 				}
@@ -352,4 +372,14 @@ func (a *App) markInbox(it hubapi.InboxItem, done bool) {
 			c.data.MarkInbox(it.ID, done, time.Now().UTC().Format(time.RFC3339))
 		})
 	})
+}
+
+// inboxItem is the entry with id, as listed.
+func (a *App) inboxItem(id string) hubapi.InboxItem {
+	for _, it := range a.conn.data.Inbox {
+		if it.ID == id {
+			return it
+		}
+	}
+	return hubapi.InboxItem{ID: id}
 }

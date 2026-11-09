@@ -64,7 +64,12 @@ func (c *Client) ReadFile(ctx context.Context, machine, path, cwd string, offset
 // Download writes a file's bytes to w (GET /machines/{mid}/file/download).
 func (c *Client) Download(ctx context.Context, machine, path, cwd string, w io.Writer) error {
 	q := url.Values{"path": {path}, "cwd": {cwd}}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint("/machines/"+url.PathEscape(machine)+"/file/download?"+q.Encode()), nil)
+	return c.Fetch(ctx, "/machines/"+url.PathEscape(machine)+"/file/download?"+q.Encode(), w)
+}
+
+// Fetch writes what a GET of path answers to w, as bytes (a download).
+func (c *Client) Fetch(ctx context.Context, path string, w io.Writer) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.endpoint(path), nil)
 	if err != nil {
 		return err
 	}

@@ -14753,6 +14753,13 @@ class H(BaseHTTPRequestHandler):
             if meta is not None:
                 meta.update({k: e[k] for k in ("importance", "relevance", "tags") if k in e})
                 if kind == "projects": meta["kind"], meta["status"] = e["extra"].split(" · ")
+            held = meta if meta is not None else e
+            if "pinned" in body:  # confirmed facts: kept apart from the inferred profile
+                held["pinned"] = body["pinned"]
+            for field in ("people", "chats", "projects"):  # a relationship removed: gone from the list, the list locked
+                if body.get("remove_" + field) and isinstance(held.get(field), list):
+                    held[field] = [x for x in held[field] if x not in body["remove_" + field]]
+                    held["locked_fields"] = sorted(set(held.get("locked_fields") or []) | {field})
             KB_UPDATES.append({"kind": kind, "id": eid, **body})
             return self.send_json({"ok": True})
         if os.environ.get("MOCK_LARK_NATIVE_OLK") and (p == "/test/lark-encryption/reset" or p == "/api/v1/lark/encryption/unlock" or p.endswith(("/encryption/covers", "/encryption/prepare", "/encrypted-messages"))):

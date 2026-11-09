@@ -362,10 +362,14 @@ type InboxItem struct {
 	DoneBy      string `json:"done_by,omitempty"`
 	Version     string `json:"version,omitempty"`
 	Connector   *struct {
+		Thread   string `json:"thread,omitempty"`
 		Label    string `json:"label,omitempty"`
+		Web      string `json:"url,omitempty"`
 		URL      string `json:"open_url,omitempty"`
+		ReplyTo  string `json:"reply_to,omitempty"`
 		CanReply bool   `json:"can_reply,omitempty"`
 	} `json:"connector,omitempty"`
+	Mail *InboxMail `json:"mail,omitempty"`
 	// Agent is the AI twin's work on the entry: its state and the reply it drafted.
 	Agent *struct {
 		State string `json:"state,omitempty"`

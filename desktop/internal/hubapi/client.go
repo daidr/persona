@@ -514,3 +514,9 @@ func (c *Client) ViewAction(ctx context.Context, conversation, key, action, page
 	}
 	return c.Do(ctx, http.MethodPost, "/assistant/conversations/"+url.PathEscape(conversation)+"/views/"+url.PathEscape(key)+"/actions", body, nil)
 }
+
+// KBPatch changes only the fields patch names on an entry (PUT /kb/{kind}/{id}): confirmed facts ("pinned") or a
+// relationship removed ("remove_people", "remove_chats", "remove_projects").
+func (c *Client) KBPatch(ctx context.Context, kind, id string, patch map[string]any) error {
+	return c.Do(ctx, http.MethodPut, "/kb/"+url.PathEscape(kind)+"/"+url.PathEscape(id), patch, nil)
+}

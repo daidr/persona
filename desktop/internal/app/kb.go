@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,6 +38,9 @@ type kbPage struct {
 	form    tagForm
 	saving  bool
 	asking  bool
+
+	facts factsEdit
+	rel   relDialog
 }
 
 type kbListState struct {
@@ -304,6 +308,7 @@ func (a *App) knowledgeView(c *ui.Context, p palette, kind, id string) {
 		})
 	})
 	a.tagDialog(c, p)
+	a.relationshipDialog(c, p)
 }
 
 // kbRow is a row of the list: an entry, or what a search found in it.
@@ -617,6 +622,9 @@ func (a *App) kbDetail(c *ui.Context, p palette, kind, id string) {
 					}
 				})
 			}
+			if slices.Contains(hubapi.KBKinds, kind) {
+				a.factsCard(c, p, kind, id, d)
+			}
 			if strings.TrimSpace(d.Recent) != "" {
 				a.card(c, p, func() {
 					ui.Text(c, a.tr("kbRecent")).Bold()
@@ -652,10 +660,13 @@ func (a *App) kbDetail(c *ui.Context, p palette, kind, id string) {
 						}
 						ui.Text(c, a.kindTitle(k)).FontSize(11).Bold().TextColor(p.ink3)
 						for _, l := range rankKB(of) {
-							a.kbLinkRow(c, p, l)
+							a.kbLinkRow(c, p, l, relationshipRemoval(d, e.Name, l))
 						}
 					}
 				})
+			}
+			if g.rel.done == kind+"/"+id {
+				ui.Text(c, a.tr("kbRelSuccess")).FontSize(small).TextColor(p.green)
 			}
 			if d.Path != "" {
 				ui.Text(c, d.Path).FontSize(11).Font("monospace").TextColor(p.ink3).Selectable()
@@ -670,8 +681,17 @@ func (a *App) pill(c *ui.Context, text string, col ui.Color) {
 	})
 }
 
-func (a *App) kbLinkRow(c *ui.Context, p palette, l hubapi.KBEntry) {
-	row := ui.ButtonBase(c.Key("link-"+l.Key())).Padding(6, 8).Radius(rowRadius).Gap(10).Label(l.Name)
+func (a *App) kbLinkRow(c *ui.Context, p palette, l hubapi.KBEntry, removal *relRemoval) {
+	ui.Row(c.Key("linkrow-" + l.Key())).Gap(4).Children(func() {
+		a.kbLinkButton(c, p, l)
+		if removal != nil && ui.Button(c, "").Label(a.tr("kbRelAction")).Tooltip(a.tr("kbRelAction")).Disabled(a.kb.rel.open).Children(func() { ui.Icon(c, icon("x")) }).Clicked() {
+			a.askRemoval(removal)
+		}
+	})
+}
+
+func (a *App) kbLinkButton(c *ui.Context, p palette, l hubapi.KBEntry) {
+	row := ui.ButtonBase(c.Key("link-"+l.Key())).Padding(6, 8).Radius(rowRadius).Gap(10).Label(l.Name).Grow(1).Shrink(1)
 	row.Children(func() {
 		ui.Text(c, l.Name).SingleLine().Shrink(0)
 		ui.Text(c, oneLine(l.OneLine, 120)).FontSize(small).TextColor(p.ink2).SingleLine().Grow(1).Shrink(1)

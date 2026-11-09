@@ -79,25 +79,28 @@ type App struct {
 	palette paletteState
 	chats   map[string]*chatState
 	// images are the chats' pictures, decoded, by item id.
-	images     map[string]ui.ImageSource
-	inbox      inboxPage
-	sets       settingsPage
-	routines   routinesPage
-	feeds      feedState
-	ready      readinessState
-	profile    profileState
-	modelLists map[string]*modelList
-	act        agentAction
-	todos      todosPage
-	kb         kbPage
-	terms      map[string]*termState
-	gits       map[string]*changesState
-	fileViews  map[string]*filesState
-	cards      map[string]*cardState
-	persona    personaState
-	start      startForm
-	badge      int
-	toasts     []string
+	images      map[string]ui.ImageSource
+	inbox       inboxPage
+	mail        mailState
+	threads     map[string]*threadState
+	threadsConn *conn
+	sets        settingsPage
+	routines    routinesPage
+	feeds       feedState
+	ready       readinessState
+	profile     profileState
+	modelLists  map[string]*modelList
+	act         agentAction
+	todos       todosPage
+	kb          kbPage
+	terms       map[string]*termState
+	gits        map[string]*changesState
+	fileViews   map[string]*filesState
+	cards       map[string]*cardState
+	persona     personaState
+	start       startForm
+	badge       int
+	toasts      []string
 }
 
 // conn is the live connection to the hub shown.
