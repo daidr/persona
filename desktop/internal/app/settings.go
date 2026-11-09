@@ -18,33 +18,44 @@ func (a *App) settingsView(c *ui.Context, p palette) {
 	if g.conn != a.conn {
 		*g = settingsPage{conn: a.conn, tab: g.tab}
 	}
-	a.pageHeader(c, p, a.tr("goSettings"), "", func() {
-		ui.Segmented(c.Key("settings-tab"), &g.tab, a.tr("settingsGeneral"), "Persona", a.tr("settingsAgents"), a.tr("settingsDevices"),
-			a.tr("settingsExtensions"), a.tr("settingsConnectors"), a.tr("settingsModels"))
-	})
+	a.pageHeader(c, p, a.tr("goSettings"), "", nil)
 	ui.Divider(c)
-	ui.Scroll(c.Key("settings-" + itoa(g.tab))).Grow(1).Children(func() {
-		ui.Column(c).MaxWidth(720).Padding(16, pagePad, 32, pagePad).Gap(16).Children(func() {
-			switch g.tab {
-			case 1:
-				a.personaSettings(c, p)
-			case 2:
-				a.agentsSettings(c, p)
-			case 3:
-				a.devicesView(c, p)
-			case 4:
-				a.extensionsView(c, p)
-			case 5:
-				a.connectorsView(c, p)
-			case modelsTab:
-				if !g.models.asked {
-					a.loadProfiles()
+	ui.Row(c).Grow(1).AlignItems(ui.Stretch).Children(func() {
+		a.settingsNav(c, p, &g.tab)
+		ui.Scroll(c.Key("settings-" + itoa(g.tab))).Grow(1).Children(func() {
+			ui.Column(c).MaxWidth(720).Padding(16, pagePad, 32, pagePad).Gap(16).Children(func() {
+				switch g.tab {
+				case 1:
+					a.personaSettings(c, p)
+				case 2:
+					a.agentsSettings(c, p)
+				case 3:
+					a.devicesView(c, p)
+				case 4:
+					a.extensionsView(c, p)
+				case 5:
+					a.mailAccountsGroup(c, p)
+					a.connectorsView(c, p)
+				case modelsTab:
+					if !g.models.asked {
+						a.loadProfiles()
+					}
+					a.profilesGroup(c, p)
+					a.modelsView(c, p)
+				case channelsTab:
+					a.channelsView(c, p)
+				case sentTab:
+					a.sentView(c, p)
+				case shortcutsTab:
+					a.shortcutsView(c, p)
+				case hubTab:
+					a.hubUpdateView(c, p)
+				case managersTab:
+					a.managersView(c, p)
+				default:
+					a.generalSettings(c, p)
 				}
-				a.profilesGroup(c, p)
-				a.modelsView(c, p)
-			default:
-				a.generalSettings(c, p)
-			}
+			})
 		})
 	})
 }

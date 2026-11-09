@@ -19,6 +19,7 @@ import (
 type settingsPage struct {
 	conn *conn
 	tab  int
+	m7   more7
 
 	devices    loadable
 	tokens     []hubapi.DeviceToken

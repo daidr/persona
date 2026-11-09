@@ -80,9 +80,14 @@ type MailMessage struct {
 
 // MailAccount is one of the hub's mail accounts.
 type MailAccount struct {
-	ID    string `json:"id"`
-	Name  string `json:"name,omitempty"`
-	Email string `json:"email"`
+	ID       string `json:"id"`
+	Name     string `json:"name,omitempty"`
+	Email    string `json:"email"`
+	Provider string `json:"provider,omitempty"` // gmail | outlook | feishu | imap
+	Auth     string `json:"auth,omitempty"`     // password | oauth2
+	IMAPHost string `json:"imap_host,omitempty"`
+	Status   string `json:"status,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 // Label is "Name · address", or the address.
