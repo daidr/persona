@@ -38,6 +38,9 @@ func (a *App) View(c *ui.Context) {
 				case r.Match("/agents"):
 					r.Title(a.tr("goAgents"))
 					a.agentsView(c, p, "")
+				case r.Match("/agents/archived"):
+					r.Title(a.tr("archivedTitle"))
+					a.archivedView(c, p)
 				case r.Match("/agents/{machine}/{session...}"):
 					r.Title(a.tr("goAgents"))
 					a.agentsView(c, p, r.Param("machine")+"/"+r.Param("session"))
@@ -120,6 +123,7 @@ func (a *App) sidebar(c *ui.Context, p palette) {
 			ui.SidebarItem(c, "/machines", icon("machine"), a.tr("goMachines"))
 			ui.SidebarItem(c, "/settings", icon("gear"), a.tr("goSettings"))
 		}).Grow(1).Background(p.inset).OnChange(func() { a.Navigate(page) })
+		a.usageBars(c, p)
 		a.connectionLine(c, p)
 	})
 }

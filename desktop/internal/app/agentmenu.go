@@ -14,12 +14,15 @@ import (
 // agentAction is the dialog an agent's menu opened: rename, session info, close or remove, for one agent.
 type agentAction struct {
 	open  bool
-	kind  string // rename | info | close | delete
+	kind  string // rename | info | close | delete | archiveClose
 	key   string
 	title string
-	info  *hubapi.SessionInfo
-	busy  bool
-	err   string
+	// machine and session are for Archive and close: where it closes, and the agent itself.
+	machine string
+	session hubapi.Session
+	info    *hubapi.SessionInfo
+	busy    bool
+	err     string
 }
 
 // agentMenu is the "…" button of a chat's header: Pin, Rename, Session info, Copy session ID, End and Remove.
@@ -56,7 +59,27 @@ func (a *App) agentMenu(c *ui.Context, p palette, x hubapi.Session, persona bool
 		if m.Item(a.tr("agentEnd")).Disabled(x.Status == "offline" || x.State == hubapi.StateOffline).Chosen() {
 			a.act = agentAction{open: true, kind: "close", key: key, title: titleOf(x)}
 		}
-		if !persona && m.Item(a.tr("agentRemove")).Chosen() {
+		// with archives on the hub, Archive takes Remove's place (as the web does)
+		archive, closeOffer := hubapi.ArchiveOffer(x, d.Hello.Features)
+		if archive != "no" {
+			label := a.tr("agentArchive")
+			if archive == "busy" {
+				label = a.tr("agentArchiveBusy")
+			}
+			if m.Item(label).Disabled(archive == "busy").Chosen() {
+				a.archiveAgent(x, false)
+			}
+		}
+		if closeOffer != "no" {
+			label := a.tr("agentArchiveClose")
+			if closeOffer == "busy" {
+				label = a.tr("agentArchiveCloseBusy")
+			}
+			if m.Item(label).Disabled(closeOffer == "busy").Chosen() {
+				a.act = agentAction{open: true, kind: "archiveClose", key: key, title: titleOf(x), machine: d.MachineName(x.MachineID), session: x}
+			}
+		}
+		if !persona && !a.archivesOn() && m.Item(a.tr("agentRemove")).Chosen() {
 			a.act = agentAction{open: true, kind: "delete", key: key, title: titleOf(x)}
 		}
 	})
@@ -138,6 +161,9 @@ func (a *App) agentDialog(c *ui.Context, p palette) {
 			case "close":
 				ui.Text(c, a.tr("agentEndTitle", "title", g.title)).FontSize(heading).Bold()
 				ui.Text(c, a.tr("agentEndBody")).TextColor(p.ink2)
+			case "archiveClose":
+				ui.Text(c, a.tr("archiveCloseTitle")).FontSize(heading).Bold()
+				ui.Text(c, a.tr("archiveCloseDetail", "title", g.title, "machine", g.machine)).TextColor(p.ink2)
 			case "delete":
 				ui.Text(c, a.tr("agentRemoveTitle", "title", g.title)).FontSize(heading).Bold()
 				ui.Text(c, a.tr("agentRemoveBody")).TextColor(p.ink2)
@@ -164,6 +190,10 @@ func (a *App) agentDialog(c *ui.Context, p palette) {
 				case "close":
 					if ui.PrimaryButton(c, a.tr("agentEnd")).Disabled(g.busy).Clicked() {
 						a.agentDo(func(ctx context.Context, cl *hubapi.Client, m, s string) error { return cl.CloseSession(ctx, m, s) }, nil)
+					}
+				case "archiveClose":
+					if ui.PrimaryButton(c, a.tr("archiveCloseConfirm")).Disabled(g.busy).Clicked() {
+						a.archiveAgent(g.session, true)
 					}
 				case "delete":
 					if ui.PrimaryButton(c, a.tr("agentRemove")).Disabled(g.busy).Clicked() {

@@ -69,7 +69,8 @@ func (h *fakeHost) SaveFile(_, _ string, done func(string)) {
 }
 
 // mockURL is the repository's mock hub (scripts/mock/mock_hub.py); gitMockURL another one whose Git can be written to
-// (MOCK_GIT_WRITE), whose main conversation dispatches tasks (MOCK_TASKS) and whose Inbox has GitHub and Telegram threads,
+// (MOCK_GIT_WRITE), whose main conversation dispatches tasks (MOCK_TASKS), whose Inbox has GitHub and Telegram threads
+// and whose agents can be archived (MOCK_AGENT_ARCHIVES),
 // which other tests would otherwise share.
 var mockURL, gitMockURL string
 
@@ -81,7 +82,7 @@ func TestMain(m *testing.M) {
 		var kill func()
 		mockURL, kill = startMock(py, "MOCK_EXTENSIONS=1")
 		stop = append(stop, kill)
-		gitMockURL, kill = startMock(py, "MOCK_GIT_WRITE=1", "MOCK_TASKS=1", "MOCK_GITHUB_INBOX=1", "MOCK_TELEGRAM=signed_in", "MOCK_TELEGRAM_INBOX=1")
+		gitMockURL, kill = startMock(py, "MOCK_GIT_WRITE=1", "MOCK_TASKS=1", "MOCK_GITHUB_INBOX=1", "MOCK_TELEGRAM=signed_in", "MOCK_TELEGRAM_INBOX=1", "MOCK_AGENT_ARCHIVES=1")
 		stop = append(stop, kill)
 	}
 	code := m.Run()

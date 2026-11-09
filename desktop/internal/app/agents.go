@@ -58,6 +58,9 @@ func (a *App) agentsList(c *ui.Context, p palette, open string) {
 	d := a.conn.data
 	ui.Row(c).Padding(16, 16, 8, 16).Children(func() {
 		ui.Text(c, a.tr("goAgents")).FontSize(title).Bold().Grow(1)
+		if a.archivesOn() && ui.Button(c, "").Label(a.tr("archivedTitle")).Tooltip(a.tr("archivedTitle")).Children(func() { ui.Icon(c, icon("archive")) }).Clicked() {
+			a.Navigate("/agents/archived")
+		}
 		if ui.Button(c, "").Label(a.tr("startTitle")).Tooltip(a.tr("startTitle")).Children(func() { ui.Icon(c, icon("plus")) }).Clicked() {
 			a.openStart("", "")
 		}

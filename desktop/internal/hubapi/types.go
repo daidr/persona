@@ -95,12 +95,20 @@ type Session struct {
 	Rev            int64         `json:"rev,omitempty"`
 	Suggestion     string        `json:"suggestion,omitempty"`
 	Archived       bool          `json:"archived,omitempty"`
-	Quiet          bool          `json:"quiet,omitempty"`
-	Muted          bool          `json:"muted,omitempty"`
-	IsSubagent     bool          `json:"is_subagent,omitempty"`
-	ContextTokens  int           `json:"context_tokens,omitempty"`
-	ContextWindow  int           `json:"context_window,omitempty"`
-	Todo           *struct {
+	// What an archive and a close look at (the manager decides; these only decide what the menu offers).
+	Starting          bool   `json:"starting,omitempty"`
+	StartError        string `json:"start_error,omitempty"`
+	StartedByPersona  bool   `json:"started_by_persona,omitempty"`
+	BackgroundWorking bool   `json:"background_working,omitempty"`
+	BackgroundWaiting bool   `json:"background_waiting,omitempty"`
+	Loop              any    `json:"loop,omitempty"`
+	Ports             []any  `json:"ports,omitempty"`
+	Quiet             bool   `json:"quiet,omitempty"`
+	Muted             bool   `json:"muted,omitempty"`
+	IsSubagent        bool   `json:"is_subagent,omitempty"`
+	ContextTokens     int    `json:"context_tokens,omitempty"`
+	ContextWindow     int    `json:"context_window,omitempty"`
+	Todo              *struct {
 		ID    string `json:"id"`
 		Title string `json:"title"`
 	} `json:"todo,omitempty"`

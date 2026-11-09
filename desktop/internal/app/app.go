@@ -74,10 +74,12 @@ type App struct {
 	md     markdown.Options
 	conn   *conn
 
-	connect connectForm
-	agents  agentsPage
-	palette paletteState
-	chats   map[string]*chatState
+	connect  connectForm
+	agents   agentsPage
+	archived archivedPage
+	usage    usageState
+	palette  paletteState
+	chats    map[string]*chatState
 	// images are the chats' pictures, decoded, by item id.
 	images      map[string]ui.ImageSource
 	inbox       inboxPage
@@ -301,6 +303,7 @@ func (a *App) open(h hubs.Hub, token string) {
 	c.socket.OnStatus = func(st hubapi.Status) { a.Host.Post(func() { a.setStatus(c, st) }) }
 	a.conn = c
 	a.chats = map[string]*chatState{}
+	a.archived, a.usage = archivedPage{}, usageState{}
 	a.refresh(c)
 	a.RunSocket(ctx, c.socket)
 }
