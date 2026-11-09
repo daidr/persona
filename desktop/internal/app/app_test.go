@@ -63,7 +63,7 @@ func (h *fakeHost) PickFiles(_ string, done func([]string)) {
 }
 
 // mockURL is the repository's mock hub (scripts/mock/mock_hub.py); gitMockURL another one whose Git can be written to
-// (MOCK_GIT_WRITE), whose status tests would otherwise share.
+// (MOCK_GIT_WRITE) and whose main conversation dispatches tasks (MOCK_TASKS), which other tests would otherwise share.
 func (h *fakeHost) SaveFile(_, _ string, done func(string)) {
 	if h.save != "" {
 		done(h.save)
@@ -80,7 +80,7 @@ func TestMain(m *testing.M) {
 		var kill func()
 		mockURL, kill = startMock(py, "MOCK_EXTENSIONS=1")
 		stop = append(stop, kill)
-		gitMockURL, kill = startMock(py, "MOCK_GIT_WRITE=1")
+		gitMockURL, kill = startMock(py, "MOCK_GIT_WRITE=1", "MOCK_TASKS=1")
 		stop = append(stop, kill)
 	}
 	code := m.Run()

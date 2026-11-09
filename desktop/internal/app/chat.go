@@ -220,8 +220,15 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 		_, conversation, _ = strings.Cut(key, "/")
 	}
 	items := visibleItems(t.Items)
+	var feed []hubapi.FeedItem
+	if conversation != "" {
+		main, _ := d.MainConversation()
+		a.loadFeed(conversation, conversation == main.SessionID)
+		feed = d.Feeds[conversation]
+	}
+	rows := chatRows(items, feed)
 	live := strings.TrimSpace(t.Live)
-	n := len(items)
+	n := len(rows)
 	extra := 0
 	if t.HasMore {
 		extra = 1
@@ -233,8 +240,8 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 		if i < extra {
 			return "older"
 		}
-		if i-extra < len(items) {
-			return items[i-extra].ID
+		if i-extra < len(rows) {
+			return rows[i-extra].key()
 		}
 		return "live"
 	}
@@ -248,8 +255,12 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 				}
 				return
 			}
-			if i-extra < len(items) {
-				a.itemView(c, p, st, items[i-extra], conversation)
+			if i-extra < len(rows) {
+				if r := rows[i-extra]; r.feed != nil {
+					a.feedView(c, p, *r.feed)
+				} else {
+					a.itemView(c, p, st, *r.item, conversation)
+				}
 				return
 			}
 			markdown.Stream(c, live, &a.md)
@@ -274,6 +285,11 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 				a.cardView(c, p, x, st, ix)
 			}
 		})
+	}
+	if persona {
+		if main, _ := d.MainConversation(); main.MachineID+"/"+main.SessionID == key {
+			a.readinessCard(c, p)
+		}
 	}
 	a.composer(c, p, key, x, known, st)
 }
@@ -343,7 +359,12 @@ func (a *App) composer(c *ui.Context, p palette, key string, x hubapi.Session, k
 	can := !known || x.Can("send")
 	working := known && a.conn.data.StateOf(x) == hubapi.StateWorking
 	a.attachmentsRow(c, p, key, st)
-	box := ui.Row(c).Margin(4, pagePad, 16, pagePad).Padding(8, 8, 8, 14).Gap(8).Radius(cardRadius).Background(p.surface).
+	chips := known && hasModes(x)
+	bottom := float32(16)
+	if chips {
+		bottom = 6
+	}
+	box := ui.Row(c).Margin(4, pagePad, bottom, pagePad).Padding(8, 8, 8, 14).Gap(8).Radius(cardRadius).Background(p.surface).
 		Border(1, p.line).AlignItems(ui.End).Children(func() {
 		place := a.tr("composerPlaceholder")
 		if !can {
@@ -377,6 +398,9 @@ func (a *App) composer(c *ui.Context, p palette, key string, x hubapi.Session, k
 			a.send(key, text)
 		}
 	})
+	if chips {
+		a.modeChips(c, p, x)
+	}
 	// files dragged onto the box are attached as the paper clip's are
 	if dropped := box.DroppedFiles(); len(dropped) > 0 && can {
 		a.addFiles(key, dropped)

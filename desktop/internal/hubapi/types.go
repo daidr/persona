@@ -78,6 +78,8 @@ type Session struct {
 	Model          string        `json:"model,omitempty"`
 	PermissionMode string        `json:"permission_mode,omitempty"`
 	Effort         string        `json:"effort,omitempty"`
+	Launcher       string        `json:"launcher,omitempty"`
+	Ultracode      bool          `json:"ultracode,omitempty"`
 	Assistant      bool          `json:"assistant,omitempty"`
 	Space          string        `json:"space,omitempty"`
 	SpaceName      string        `json:"space_name,omitempty"`
@@ -515,6 +517,9 @@ type StartRequest struct {
 	// Model and Effort override the model settings for this start only (a preset's).
 	Model  string `json:"model,omitempty"`
 	Effort string `json:"effort,omitempty"`
+	// PermissionMode is the agent's first permission mode; Ultracode starts Claude Code's ultracode on.
+	PermissionMode string `json:"permission_mode,omitempty"`
+	Ultracode      bool   `json:"ultracode,omitempty"`
 }
 
 // KBKinds are the knowledge base's kinds of entries, in the order the apps show them (docs/assistant/knowledge.md).

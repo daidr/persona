@@ -61,6 +61,8 @@ func (a *App) personaPage(c *ui.Context, p palette, open string) {
 			switch {
 			case open == "new":
 				a.newConversation(c, p)
+			case open == "profile":
+				a.profileView(c, p)
 			case open != "":
 				title := a.tr("personaMain")
 				if open != main.SessionID {
@@ -99,6 +101,9 @@ func (a *App) conversationList(c *ui.Context, p palette, open, mainID string) {
 	}
 	ui.Row(c).Padding(16, 16, 8, 16).Gap(8).Children(func() {
 		ui.Text(c, a.tr("goPersona")).FontSize(title).Bold().Grow(1)
+		if ui.Button(c, "").Label(a.tr("profileTitle")).Tooltip(a.tr("profileTitle")).Children(func() { ui.Icon(c, icon("spark")) }).Clicked() {
+			a.Navigate("/persona/profile")
+		}
 		if ui.Button(c, "").Label(a.tr("personaNew")).Tooltip(a.tr("personaNew")).Children(func() { ui.Icon(c, icon("plus")) }).Clicked() {
 			a.Navigate("/persona/new")
 		}

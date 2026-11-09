@@ -30,8 +30,13 @@ type startForm struct {
 	tier         string
 	tierFor      string
 	prompt       string
-	busy         bool
-	err          string
+	// mode, model and effort are the options' labels as chosen ("" the defaults); ultracode starts it on.
+	mode      string
+	model     string
+	effort    string
+	ultracode bool
+	busy      bool
+	err       string
 }
 
 // openStart opens the New agent dialog, for a to-do when todo isn't "".
@@ -199,6 +204,7 @@ func (a *App) startView(c *ui.Context, p palette) {
 					ui.Select(c.Key("start-launcher"), &f.launcher, opts).Label(a.tr("startLauncher"))
 				})
 			}
+			a.startOptions(c, p)
 			a.field(c, p, a.tr("startPrompt"), func() {
 				ui.TextArea(c.Key("start-prompt"), &f.prompt).Lines(3, 8).Placeholder(a.tr("startPromptPlaceholder")).Label(a.tr("startPrompt"))
 			})
@@ -304,6 +310,7 @@ func (a *App) startAgent() {
 	if t, ok := f.pickedTier(); ok {
 		req.Model, req.Effort = t.Model, t.Effort
 	}
+	a.startPicks(&req)
 	f.busy, f.err = true, ""
 	a.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -383,4 +390,95 @@ func (a *App) presetField(c *ui.Context, p palette) {
 		}
 		ui.Text(c, hint).FontSize(small).TextColor(p.ink3)
 	})
+}
+
+// pickedLauncher is the launcher chosen, or the computer's first.
+func (f *startForm) pickedLauncher() hubapi.Launcher {
+	for _, l := range f.launchers {
+		if launcherLabel(l) == f.launcher {
+			return l
+		}
+	}
+	if len(f.launchers) > 0 {
+		return f.launchers[0]
+	}
+	return hubapi.Launcher{}
+}
+
+// startOptions are the agent's first permission mode, its model and effort (unless a preset chose them) and
+// ultracode, for Claude Code's launchers.
+func (a *App) startOptions(c *ui.Context, p palette) {
+	f := &a.start
+	l := f.pickedLauncher()
+	if f.machine == "" || l.Agent != "" && l.Agent != "claude" {
+		return
+	}
+	_, tiered := f.pickedTier()
+	ui.Row(c).Gap(10).Wrap().Children(func() {
+		modes := make([]string, len(hubapi.PermissionModes))
+		for i, id := range hubapi.PermissionModes {
+			modes[i] = a.modeLabel(id)
+		}
+		if f.mode == "" {
+			f.mode = modes[0]
+		}
+		a.field(c, p, a.tr("startMode"), func() {
+			ui.Select(c.Key("start-mode"), &f.mode, modes).Label(a.tr("startMode")).Width(170)
+		})
+		if tiered {
+			return
+		}
+		ml := a.models(f.machine, l.Name)
+		if len(ml.list.Models) > 0 && ml.list.Locked == "" {
+			names := []string{a.tr("modelDefault")}
+			for _, m := range ml.list.Models {
+				names = append(names, m.Name)
+			}
+			if f.model == "" {
+				f.model = names[0]
+			}
+			a.field(c, p, a.tr("startModel"), func() {
+				ui.Select(c.Key("start-model"), &f.model, names).Label(a.tr("startModel")).Width(200)
+			})
+		}
+		efforts := []string{a.tr("effortDefault")}
+		for _, id := range hubapi.Efforts {
+			efforts = append(efforts, a.effortLabel(id))
+		}
+		if f.effort == "" {
+			f.effort = efforts[0]
+		}
+		a.field(c, p, a.tr("startEffort"), func() {
+			ui.Select(c.Key("start-effort"), &f.effort, efforts).Label(a.tr("startEffort")).Width(150)
+		})
+	})
+	ui.Checkbox(c.Key("start-ultra"), &f.ultracode, a.tr("ultracode")).Tooltip(a.tr("ultracodeHint"))
+}
+
+// startPicks puts the options chosen into the start.
+func (a *App) startPicks(req *hubapi.StartRequest) {
+	f := &a.start
+	l := f.pickedLauncher()
+	if l.Agent != "" && l.Agent != "claude" {
+		return
+	}
+	for _, id := range hubapi.PermissionModes {
+		if a.modeLabel(id) == f.mode && id != "default" {
+			req.PermissionMode = id
+		}
+	}
+	req.Ultracode = f.ultracode
+	if _, tiered := f.pickedTier(); tiered {
+		return
+	}
+	for _, m := range a.models(f.machine, l.Name).list.Models {
+		if m.Name == f.model && !m.Default {
+			req.Model = m.ID
+		}
+	}
+	for _, id := range hubapi.Efforts {
+		if a.effortLabel(id) == f.effort {
+			req.Effort = id
+		}
+	}
 }

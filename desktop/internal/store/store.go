@@ -58,6 +58,9 @@ type Store struct {
 	InboxLoaded  bool
 	Todos        []hubapi.Todo
 	TodosLoaded  bool
+	// Feeds are what the hub put into each assistant conversation, oldest first; Plans the plans they name.
+	Feeds map[string][]hubapi.FeedItem
+	Plans map[string]hubapi.TaskPlan
 	// Pins are the agents and spaces pinned, kept on the hub.
 	Pins       hubapi.Pins
 	PinsLoaded bool
@@ -156,6 +159,17 @@ func (s *Store) Apply(ev hubapi.Event) Effect {
 		fx.Todos = true
 	case "assistant_schedule":
 		fx.Schedule = true
+	case "assistant_feed":
+		if it, ok := hubapi.DecodeFeedItem(ev.Raw); ok {
+			s.PutFeed(it)
+		}
+	case "task_plan":
+		var m struct {
+			Plan *hubapi.TaskPlan `json:"plan"`
+		}
+		if ev.Decode(&m) == nil && m.Plan != nil {
+			s.PutPlan(*m.Plan)
+		}
 	}
 	return fx
 }
@@ -228,6 +242,33 @@ func (s *Store) PutSession(x hubapi.Session) {
 		}
 	}
 	s.Sessions[x.MachineID] = append(list, x)
+}
+
+// PutFeed adds a conversation's item, or replaces the one with its id, keeping them in time order.
+func (s *Store) PutFeed(items ...hubapi.FeedItem) {
+	if s.Feeds == nil {
+		s.Feeds = map[string][]hubapi.FeedItem{}
+	}
+	for _, it := range items {
+		list := s.Feeds[it.Conversation]
+		if i := slices.IndexFunc(list, func(x hubapi.FeedItem) bool { return x.ID == it.ID }); i >= 0 {
+			list[i] = it
+			continue
+		}
+		list = append(list, it)
+		slices.SortStableFunc(list, func(x, y hubapi.FeedItem) int {
+			return hubapi.ParseTime(x.At).Compare(hubapi.ParseTime(y.At))
+		})
+		s.Feeds[it.Conversation] = list
+	}
+}
+
+// PutPlan keeps a plan as the hub last told it.
+func (s *Store) PutPlan(p hubapi.TaskPlan) {
+	if s.Plans == nil {
+		s.Plans = map[string]hubapi.TaskPlan{}
+	}
+	s.Plans[p.ID] = p
 }
 
 // DropSession takes an agent out of the lists, until its computer's next list.
