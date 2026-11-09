@@ -59,6 +59,8 @@ type App struct {
 	Version string
 	// Go runs background work: a goroutine in the app, inline in tests.
 	Go func(func())
+	// After runs fn on the main thread after d; tests run it at once.
+	After func(d time.Duration, fn func())
 	// RunSocket keeps the hub's WebSocket open until ctx ends; tests leave it out.
 	RunSocket func(ctx context.Context, s *hubapi.Socket)
 
@@ -73,6 +75,8 @@ type App struct {
 	sets    settingsPage
 	todos   todosPage
 	kb      kbPage
+	terms   map[string]*termState
+	gits    map[string]*changesState
 	start   startForm
 	badge   int
 	toasts  []string
@@ -97,6 +101,7 @@ func New(host Host, list *hubs.Store, lang, version string) *App {
 	a := &App{Host: host, Hubs: list, Lang: lang, Version: version, router: ui.NewRouter("/"), chats: map[string]*chatState{}}
 	a.Go = func(fn func()) { go fn() }
 	a.RunSocket = func(ctx context.Context, s *hubapi.Socket) { go s.Run(ctx) }
+	a.After = func(d time.Duration, fn func()) { time.AfterFunc(d, func() { a.Host.Post(fn) }) }
 	a.router.Transition = ui.TransitionNone
 	if a.Hubs.Settings.DeviceID == "" {
 		b := make([]byte, 16)

@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
@@ -393,4 +394,41 @@ func (c *Client) KBSearch(ctx context.Context, query string) ([]KBResult, error)
 // KBUpdate saves an entry's tagging.
 func (c *Client) KBUpdate(ctx context.Context, kind, id string, u KBUpdate) error {
 	return c.Do(ctx, http.MethodPut, "/kb/"+url.PathEscape(kind)+"/"+url.PathEscape(id), u, nil)
+}
+
+func sessionPath(machine, session string) string {
+	return "/sessions/" + url.PathEscape(machine) + "/" + url.PathEscape(session)
+}
+
+// Screen reads what an agent's terminal shows now.
+func (c *Client) Screen(ctx context.Context, machine, session string, lines int) (Screen, error) {
+	var out Screen
+	err := c.Do(ctx, http.MethodGet, sessionPath(machine, session)+"/screen?source=visible&lines="+strconv.Itoa(lines), nil, &out)
+	return out, err
+}
+
+// Keys types into an agent's terminal: text as is, then the named keys ("enter", "esc", "tab", "up", "ctrl+c"…).
+func (c *Client) Keys(ctx context.Context, machine, session, text string, keys ...string) error {
+	if keys == nil {
+		keys = []string{}
+	}
+	return c.Do(ctx, http.MethodPost, sessionPath(machine, session)+"/keys", map[string]any{"keys": keys, "text": text}, nil)
+}
+
+// GitStatus reads a checkout's status on a computer.
+func (c *Client) GitStatus(ctx context.Context, machine, cwd string) (GitStatus, error) {
+	var out GitStatus
+	err := c.Do(ctx, http.MethodGet, "/machines/"+url.PathEscape(machine)+"/git/status?cwd="+url.QueryEscape(cwd), nil, &out)
+	return out, err
+}
+
+// GitDiff reads one file's diff, the staged one when staged.
+func (c *Client) GitDiff(ctx context.Context, machine, cwd, path string, staged bool) (GitDiff, error) {
+	var out GitDiff
+	q := url.Values{"cwd": {cwd}, "path": {path}, "staged": {"0"}}
+	if staged {
+		q.Set("staged", "1")
+	}
+	err := c.Do(ctx, http.MethodGet, "/machines/"+url.PathEscape(machine)+"/git/diff?"+q.Encode(), nil, &out)
+	return out, err
 }

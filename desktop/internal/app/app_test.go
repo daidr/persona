@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"image/png"
@@ -91,6 +92,7 @@ func signedIn(t *testing.T, lang string) (*App, *fakeHost) {
 	host := newHost()
 	a := New(host, hubs.Load(filepath.Join(t.TempDir(), "hubs.json")), lang, "1.0.0")
 	a.Go = func(fn func()) { fn() }
+	a.After = func(_ time.Duration, fn func()) { fn() }
 	a.RunSocket = func(context.Context, *hubapi.Socket) {}
 	var err error
 	a.SignIn(mockURL, "Home", "jd_test", func(e error) { err = e })
@@ -530,5 +532,89 @@ func TestKBHelpers(t *testing.T) {
 	txt := a.askText(hubapi.KBEntry{Name: `A"B`}, hubapi.KBDetail{Summary: "x</persona-context >y"})
 	if !strings.Contains(txt, `title="Knowledge · A&quot;B"`) || strings.Count(txt, "</persona-context>") != 1 {
 		t.Fatal(txt)
+	}
+}
+
+func TestTerminalAndChanges(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	var x hubapi.Session
+	for _, list := range a.conn.data.Sessions {
+		for _, s := range list {
+			if s.Cwd == "/Users/me/code/weather" && s.Can("terminal") {
+				x = s
+			}
+		}
+	}
+	if x.SessionID == "" {
+		t.Fatal("no agent in the weather folder")
+	}
+	a.Navigate("/agents/" + x.Key())
+	tt := ui.NewTester(a.View, 1280, 800)
+	tt.Frame()
+	if err := tt.Click(a.tr("paneTerminal")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	st := a.term(x.Key())
+	if !st.loaded || !strings.Contains(st.screen.Text, "swift test") {
+		t.Fatalf("screen: %+v", st)
+	}
+	shot(t, tt, "terminal-light")
+	tt.SetDark(true)
+	shot(t, tt, "terminal-dark")
+	tt.SetDark(false)
+	st.input = "ls"
+	a.sendKeys(x.Key(), st.input, "enter")
+	if err := tt.Click("esc"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	var keys struct {
+		Keys []struct {
+			Keys []string `json:"keys"`
+			Text string   `json:"text"`
+		} `json:"keys"`
+	}
+	getJSON(t, mockURL+"/mock/keys", &keys)
+	n := len(keys.Keys)
+	if n < 2 || keys.Keys[n-2].Text != "ls" || keys.Keys[n-2].Keys[0] != "enter" || keys.Keys[n-1].Keys[0] != "esc" {
+		t.Fatalf("keys: %+v", keys.Keys)
+	}
+
+	if err := tt.Click(a.tr("paneChanges")); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	if !tt.HasText("main → origin/main  ↑1") || !tt.HasText("README.md") {
+		t.Fatalf("changes: %q", tt.Texts())
+	}
+	if err := tt.Click("README.md"); err != nil {
+		t.Fatal(err)
+	}
+	tt.Frame()
+	tt.Frame()
+	if !tt.HasText("+A small sample app.") {
+		t.Fatalf("diff: %q", tt.Texts())
+	}
+	shot(t, tt, "changes-light")
+	tt.SetDark(true)
+	shot(t, tt, "changes-dark")
+	if fileMark(hubapi.GitFile{Index: "A", Worktree: "."}) != "A" || fileMark(hubapi.GitFile{Index: "?", Worktree: "?"}) != "?" ||
+		!staged(hubapi.GitFile{Index: "A", Worktree: "."}) || staged(hubapi.GitFile{Index: "M", Worktree: "M"}) {
+		t.Fatal("marks")
+	}
+}
+
+func getJSON(t *testing.T, u string, out any) {
+	t.Helper()
+	res, err := http.Get(u)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if err := json.NewDecoder(res.Body).Decode(out); err != nil {
+		t.Fatal(err)
 	}
 }

@@ -21,6 +21,8 @@ type chatState struct {
 	answers  map[string]map[string][]string
 	feedback map[string]string
 	busy     map[string]bool
+	// pane is what the agent's page shows: its chat, terminal or changes.
+	pane int
 }
 
 func (a *App) chat(key string) *chatState {
@@ -170,6 +172,9 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 			sub += " · " + x.Cwd
 		}
 		a.pageHeader(c, p, titleOf(x), sub, func() {
+			if known && x.Can("read") {
+				ui.Segmented(c.Key("pane-"+key), &st.pane, a.tr("paneChat"), a.tr("paneTerminal"), a.tr("paneChanges"))
+			}
 			if known {
 				state := d.StateOf(x)
 				ui.Row(c).Gap(6).Padding(3, 10).Radius(999).Background(p.inset).Children(func() {
@@ -179,6 +184,14 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 			}
 		})
 		ui.Divider(c)
+		switch st.pane {
+		case paneTerminal:
+			a.terminalPane(c, p, key, x)
+			return
+		case paneChanges:
+			a.changesPane(c, p, key, x)
+			return
+		}
 	}
 	items := visibleItems(t.Items)
 	live := strings.TrimSpace(t.Live)

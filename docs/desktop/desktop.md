@@ -16,6 +16,7 @@ The work goes in stages toward the web app's features. What it has so far:
 | Live connection | The WebSocket (`/api/v1/ws`) with `client_hello`, app-level pings, reconnecting with backoff (0.6 s to 15 s) and reading everything again after a drop; the sidebar's foot says online, connecting or offline with Retry. A token the hub refuses goes back to the sign-in with the hub filled in. |
 | Persona | The assistant's main chat: its transcript (Markdown, streaming replies as they are written), sending, its cards. |
 | Agents | Every computer's agents grouped as the other clients group them (needs you, working, unread, idle, offline), searchable, beside the chat of the one chosen: the transcript (text, thinking folded, tool calls on one line, errors), earlier turns as you scroll up, sending with Enter (Shift+Enter for a new line), Stop while it works, and marking it read. |
+| Terminal and changes | An agent's page switches between its chat, its terminal and its changes. The terminal is the agent's screen as text, read again every 1.5 s while it is shown (`GET /api/v1/sessions/{mid}/{sid}/screen`), with a line to type (Enter sends it with Enter) and Esc, Tab, ⌃C, the arrows and Enter (`POST …/keys`); a session without the `terminal` capability is watched only. Changes are the agent's folder's branch, upstream, ahead / behind and last commit, its changed files with their lines added and removed, and the chosen file's diff (`git/status`, `git/diff`; a change only in the index shows the staged diff). |
 | Cards | Answering what an agent waits on, in its chat: permissions (Allow, the "always" choice when the hub offers one, Deny), questions (single and multiple choice), plans (Approve, or Keep planning with what to change), terminal dialogs (their options). MCP forms and typed answers say to use the web app or the phone; a card answered elsewhere goes away. |
 | To-dos | Open and done to-dos, a new one from the field at the top (Enter), Mark done / Reopen, notes, the stage and pull request the hub tracked, the agents on it (each opens its chat), Delete after asking, and Start an agent for it. Read again on the hub's `todos` event. |
 | New agent | From the agents list's + or a to-do: an online computer, a folder (typed, from the folders agents started in lately, or browsed through its subfolders and up), the computer's launcher (its default chosen first) and an optional first message; `POST /api/v1/sessions` (with `todo_id` from a to-do) and its chat opens. |
@@ -28,8 +29,7 @@ The work goes in stages toward the web app's features. What it has so far:
 | Menus | Settings (⌘, / Ctrl+,), Go (Persona, Agents, To-dos, Inbox, Knowledge, Computers on ⌘1–⌘6 / Ctrl+1–6, Back, Forward), Hub (the hubs, Manage Hubs ⌘⇧H), View (zoom, full screen), Edit and Window. |
 | The rest | ⌥⌘P / Ctrl+Alt+P shows or hides the window from any app; one instance (a second launch brings the first forward); `persona://pair` links sign in; the window's size and place remembered; open at login. |
 
-Later stages, in the web app's order of use: an agent's terminal and
-its changes, the assistant's other chats and rich cards, Inbox replies and drafts, MCP forms, images and files in
+Later stages, in the web app's order of use: the assistant's other chats and rich cards, Inbox replies and drafts, MCP forms, images and files in
 messages, the command palette, and the rest of Settings (devices, extensions, connectors, models). Until then those
 are in the web app and the phone apps, which work with the same hub at the same time.
 

@@ -198,5 +198,22 @@
   "kbStatusPaused": "一時停止",
   "kbStatusDone": "完了",
   "kbStatusIgnored": "プロジェクトではない",
-  "kbStatusMerged": "統合済み"
+  "kbStatusMerged": "統合済み",
+  "paneChat": "チャット",
+  "paneTerminal": "ターミナル",
+  "paneChanges": "変更",
+  "terminalBlank": "（画面は空です）",
+  "terminalType": "ターミナルに入力して Enter で送信",
+  "terminalReadOnly": "このエージェントのターミナルは表示のみです。",
+  "changesNoFolder": "このエージェントにはフォルダがありません",
+  "changesRefresh": "更新",
+  "changesNotRepo": "Git リポジトリではありません",
+  "changesNone": "変更はありません",
+  "changesNoneHint": "このフォルダの内容はすべてコミット済みです。",
+  "changesFiles": "{count} 件の変更",
+  "changesPick": "ファイルを選んでください",
+  "changesRenamed": "{path} から名前変更",
+  "changesBinary": "バイナリファイルのため差分はありません",
+  "changesNoDiff": "表示する差分はありません",
+  "changesTruncated": "差分が長すぎるため、残りは表示されません。"
 }

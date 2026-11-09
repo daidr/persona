@@ -242,24 +242,25 @@ func (a *App) kbSearch() {
 	}
 	g.searching = true
 	c := a.conn
-	a.Go(func() {
-		time.Sleep(300 * time.Millisecond)
+	a.After(300*time.Millisecond, func() {
 		if g.searchSeq.Load() != seq {
 			return
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-		res, err := c.client.KBSearch(ctx, q)
-		a.Host.Post(func() {
-			if g.searchSeq.Load() != seq || !a.live(c) {
-				return
-			}
-			g.searching = false
-			if err != nil {
-				g.searchErr = a.errorText(err)
-				return
-			}
-			g.found, g.foundQ = res, q
+		a.Go(func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			res, err := c.client.KBSearch(ctx, q)
+			a.Host.Post(func() {
+				if g.searchSeq.Load() != seq || !a.live(c) {
+					return
+				}
+				g.searching = false
+				if err != nil {
+					g.searchErr = a.errorText(err)
+					return
+				}
+				g.found, g.foundQ = res, q
+			})
 		})
 	})
 }

@@ -198,5 +198,22 @@
   "kbStatusPaused": "Paused",
   "kbStatusDone": "Done",
   "kbStatusIgnored": "Not a project",
-  "kbStatusMerged": "Merged"
+  "kbStatusMerged": "Merged",
+  "paneChat": "Chat",
+  "paneTerminal": "Terminal",
+  "paneChanges": "Changes",
+  "terminalBlank": "(the screen is empty)",
+  "terminalType": "Type into the terminal, Enter to send",
+  "terminalReadOnly": "This agent's terminal can only be watched.",
+  "changesNoFolder": "This agent has no folder",
+  "changesRefresh": "Refresh",
+  "changesNotRepo": "Not a Git repository",
+  "changesNone": "No changes",
+  "changesNoneHint": "Everything in this folder is committed.",
+  "changesFiles": "{count} CHANGED",
+  "changesPick": "Choose a file",
+  "changesRenamed": "renamed from {path}",
+  "changesBinary": "A binary file: no diff to show",
+  "changesNoDiff": "No differences to show",
+  "changesTruncated": "The diff is too long; the rest isn't shown."
 }

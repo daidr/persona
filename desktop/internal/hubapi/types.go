@@ -51,6 +51,7 @@ type Capabilities struct {
 	Send      bool `json:"send,omitempty"`
 	Interrupt bool `json:"interrupt,omitempty"`
 	Approve   bool `json:"approve,omitempty"`
+	Terminal  bool `json:"terminal,omitempty"`
 }
 
 // Session is an agent: a conversation of Claude Code, Codex or another runtime on one of the computers.
@@ -114,6 +115,8 @@ func (s Session) Can(op string) bool {
 		return s.Capabilities.Interrupt
 	case "approve":
 		return s.Capabilities.Approve
+	case "terminal":
+		return s.Capabilities.Terminal
 	}
 	return s.Capabilities.Read
 }
@@ -474,4 +477,53 @@ type KBUpdate struct {
 	Tags        []string `json:"tags"`
 	Status      string   `json:"status,omitempty"`
 	ProjectKind string   `json:"project_kind,omitempty"`
+}
+
+// Screen is what an agent's terminal shows (GET /sessions/{mid}/{sid}/screen).
+type Screen struct {
+	Text   string `json:"text"`
+	Status string `json:"status,omitempty"`
+}
+
+// GitFile is a changed file in a checkout.
+type GitFile struct {
+	Path     string `json:"path"`
+	OrigPath string `json:"orig_path,omitempty"`
+	// Index and Worktree are git's status letters ("M", "A", "?", "." for none).
+	Index    string `json:"index"`
+	Worktree string `json:"worktree"`
+	Added    int    `json:"added"`
+	Deleted  int    `json:"deleted"`
+	Binary   bool   `json:"binary,omitempty"`
+}
+
+// GitCommit is a commit in a checkout's history.
+type GitCommit struct {
+	Hash    string `json:"hash"`
+	Short   string `json:"short"`
+	Subject string `json:"subject"`
+	Author  string `json:"author,omitempty"`
+	Date    string `json:"date,omitempty"`
+	Refs    string `json:"refs,omitempty"`
+}
+
+// GitStatus is a checkout's branch, changes and latest commits (GET /machines/{mid}/git/status).
+type GitStatus struct {
+	IsRepo   bool        `json:"is_repo"`
+	Root     string      `json:"root,omitempty"`
+	Branch   string      `json:"branch,omitempty"`
+	Head     *GitCommit  `json:"head,omitempty"`
+	Upstream string      `json:"upstream,omitempty"`
+	Ahead    int         `json:"ahead"`
+	Behind   int         `json:"behind"`
+	Files    []GitFile   `json:"files"`
+	Stashes  int         `json:"stashes,omitempty"`
+	Commits  []GitCommit `json:"commits,omitempty"`
+}
+
+// GitDiff is one file's diff.
+type GitDiff struct {
+	Path      string `json:"path"`
+	Diff      string `json:"diff"`
+	Truncated bool   `json:"truncated,omitempty"`
 }

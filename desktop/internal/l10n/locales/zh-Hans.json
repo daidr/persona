@@ -198,5 +198,22 @@
   "kbStatusPaused": "暂停",
   "kbStatusDone": "已完成",
   "kbStatusIgnored": "不是项目",
-  "kbStatusMerged": "已合并"
+  "kbStatusMerged": "已合并",
+  "paneChat": "对话",
+  "paneTerminal": "终端",
+  "paneChanges": "改动",
+  "terminalBlank": "（屏幕是空的）",
+  "terminalType": "在终端里输入，回车发送",
+  "terminalReadOnly": "这个 Agent 的终端只能查看。",
+  "changesNoFolder": "这个 Agent 没有工作目录",
+  "changesRefresh": "刷新",
+  "changesNotRepo": "不是 Git 仓库",
+  "changesNone": "没有改动",
+  "changesNoneHint": "这个目录里的内容都已提交。",
+  "changesFiles": "{count} 个改动",
+  "changesPick": "选择一个文件",
+  "changesRenamed": "由 {path} 重命名",
+  "changesBinary": "二进制文件，没有可显示的差异",
+  "changesNoDiff": "没有可显示的差异",
+  "changesTruncated": "差异太长，其余部分未显示。"
 }
