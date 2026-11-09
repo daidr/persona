@@ -185,6 +185,9 @@ func (a *App) chatView(c *ui.Context, p palette, key string, persona bool) {
 		if x.Cwd != "" {
 			sub += " · " + x.Cwd
 		}
+		if x.Branch != "" {
+			sub += " · " + a.tr("onBranch", "branch", x.Branch)
+		}
 		a.pageHeader(c, p, titleOf(x), sub, func() {
 			if known && x.Can("read") {
 				ui.Segmented(c.Key("pane-"+key), &st.pane, a.tr("paneChat"), a.tr("paneTerminal"), a.tr("paneChanges"))
@@ -287,15 +290,12 @@ func visibleItems(all []hubapi.Item) []hubapi.Item {
 
 func (a *App) itemView(c *ui.Context, p palette, st *chatState, it hubapi.Item, conversation string) {
 	switch {
+	case it.Role == "user" && it.Kind == "text" && it.MessageSource() != nil:
+		a.sourceView(c, p, st, it, it.MessageSource())
+	case it.Role == "user" && it.Kind == "text" && it.Injected != nil && it.Injected.Line != "":
+		ui.Text(c, it.Injected.Line).FontSize(small).TextColor(p.ink3).TextAlign(ui.Center)
 	case it.Role == "user" && it.Kind == "text":
-		ui.Column(c).AlignItems(ui.End).Children(func() {
-			b := ui.Column(c).Padding(8, 12).Radius(14).Background(p.userBubble).MaxWidthPercent(78).MaxWidth(620).Children(func() {
-				ui.Text(c, it.Text).Selectable()
-			})
-			if it.Seq < 0 {
-				b.Opacity(0.6)
-			}
-		})
+		a.userBubble(c, p, it)
 	case it.Kind == "text":
 		a.richText(c, p, it, conversation)
 	case it.Kind == "thinking":

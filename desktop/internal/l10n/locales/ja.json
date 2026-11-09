@@ -321,5 +321,19 @@
   "deviceAddedOn": "{time} に追加",
   "deviceRevokedOn": "{time} に取り消し",
   "connSyncedOn": "{time} に同期",
-  "extManager": "マネージャー {manager}"
+  "extManager": "マネージャー {manager}",
+  "contextUntitled": "コンテキスト",
+  "photosAttached": "写真 {count} 枚",
+  "sourceConversation": "別のチャット",
+  "sourcePatrol": "定期実行",
+  "sourceFollowup": "フォローアップ",
+  "sourceSupervision": "監督",
+  "sourceOther": "自動",
+  "sourceMore": "もっと見る",
+  "sourceLess": "閉じる",
+  "changesUpstreamGone": "リモートの上流ブランチは削除されています",
+  "startPreset": "プリセット",
+  "startPresetNone": "なし",
+  "startPresetHint": "モデルプロファイル {profile} のティア：ランチャーとそのモデル・推論の強さ",
+  "onBranch": "ブランチ {branch}"
 }

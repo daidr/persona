@@ -23,9 +23,15 @@ type startForm struct {
 	launchers       []hubapi.Launcher
 	launcher        string // the launcher's label
 	launchersFor    string
-	prompt          string
-	busy            bool
-	err             string
+	// tiers are the computer's presets, tier the one picked ("" none) and tierFor the launcher it picked, so a
+	// launcher chosen by hand afterwards unmarks it.
+	tiers        []hubapi.Tier
+	tiersProfile string
+	tier         string
+	tierFor      string
+	prompt       string
+	busy         bool
+	err          string
 }
 
 // openStart opens the New agent dialog, for a to-do when todo isn't "".
@@ -117,6 +123,10 @@ func (a *App) loadStart(machine, path string) {
 			}
 			if needLaunchers && lsErr == nil {
 				f.launchers, f.launchersFor = ls.Launchers, machine
+				f.tiers, f.tier, f.tiersProfile = ls.Tiers, "", ""
+				if ls.TiersProfile != nil {
+					f.tiersProfile = ls.TiersProfile.Name
+				}
 				labels := make([]string, len(ls.Launchers))
 				for i, l := range ls.Launchers {
 					labels[i] = launcherLabel(l)
@@ -177,6 +187,9 @@ func (a *App) startView(c *ui.Context, p palette) {
 			a.field(c, p, a.tr("startFolder"), func() {
 				a.folderPicker(c, p)
 			})
+			if len(f.tiers) > 0 {
+				a.presetField(c, p)
+			}
 			if len(f.launchers) > 0 {
 				opts := make([]string, len(f.launchers))
 				for i, l := range f.launchers {
@@ -288,6 +301,9 @@ func (a *App) startAgent() {
 			req.Launcher, req.AgentType = l.Name, l.AgentType
 		}
 	}
+	if t, ok := f.pickedTier(); ok {
+		req.Model, req.Effort = t.Model, t.Effort
+	}
 	f.busy, f.err = true, ""
 	a.Go(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
@@ -313,5 +329,58 @@ func (a *App) startAgent() {
 			}
 			a.Navigate("/agents/" + s.Key())
 		})
+	})
+}
+
+// pickedTier is the preset still in force: picked, and its launcher not changed by hand since.
+func (f *startForm) pickedTier() (hubapi.Tier, bool) {
+	if f.tier == "" || f.launcher != f.tierFor {
+		return hubapi.Tier{}, false
+	}
+	for _, t := range f.tiers {
+		if t.Name == f.tier {
+			return t, true
+		}
+	}
+	return hubapi.Tier{}, false
+}
+
+// presetField picks one of the model profile's tiers: it chooses the launcher, and its model and effort go with the start.
+func (a *App) presetField(c *ui.Context, p palette) {
+	f := &a.start
+	none := a.tr("startPresetNone")
+	opts := []string{none}
+	for _, t := range f.tiers {
+		opts = append(opts, t.Name)
+	}
+	picked := none
+	t, ok := f.pickedTier()
+	if ok {
+		picked = t.Name
+	}
+	a.field(c, p, a.tr("startPreset"), func() {
+		if ui.Select(c.Key("start-preset"), &picked, opts).Label(a.tr("startPreset")).Changed() {
+			f.tier, f.tierFor = "", ""
+			for _, x := range f.tiers {
+				if x.Name != picked {
+					continue
+				}
+				for _, l := range f.launchers {
+					if l.Name == x.Launcher {
+						f.tier, f.launcher, f.tierFor = x.Name, launcherLabel(l), launcherLabel(l)
+						break
+					}
+				}
+			}
+			t, ok = f.pickedTier()
+		}
+		hint := a.tr("startPresetHint", "profile", f.tiersProfile)
+		if ok {
+			hint = t.Description
+			if hint == "" {
+				hint = strings.Join(strings.Fields(t.Launcher+" "+t.Model+" "+t.Effort), " · ")
+			}
+		}
+		ui.Text(c, hint).FontSize(small).TextColor(p.ink3)
 	})
 }

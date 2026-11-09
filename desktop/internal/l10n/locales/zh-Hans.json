@@ -321,5 +321,19 @@
   "deviceAddedOn": "{time} 添加",
   "deviceRevokedOn": "{time} 撤销",
   "connSyncedOn": "{time} 同步",
-  "extManager": "管理器 {manager}"
+  "extManager": "管理器 {manager}",
+  "contextUntitled": "上下文",
+  "photosAttached": "{count} 张照片",
+  "sourceConversation": "另一段对话",
+  "sourcePatrol": "定时任务",
+  "sourceFollowup": "跟进",
+  "sourceSupervision": "监督",
+  "sourceOther": "自动消息",
+  "sourceMore": "展开",
+  "sourceLess": "收起",
+  "changesUpstreamGone": "远端的上游分支已被删除",
+  "startPreset": "预设",
+  "startPresetNone": "不用",
+  "startPresetHint": "模型配置方案 {profile} 的档位：启动器及其模型和思考强度",
+  "onBranch": "分支 {branch}"
 }

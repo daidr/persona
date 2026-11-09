@@ -58,10 +58,15 @@ type Capabilities struct {
 
 // Session is an agent: a conversation of Claude Code, Codex or another runtime on one of the computers.
 type Session struct {
-	MachineID      string        `json:"machine_id"`
-	SessionID      string        `json:"session_id"`
-	Title          string        `json:"title"`
-	Cwd            string        `json:"cwd"`
+	MachineID string `json:"machine_id"`
+	SessionID string `json:"session_id"`
+	Title     string `json:"title"`
+	Cwd       string `json:"cwd"`
+	// RepoRoot, Worktree and Branch place the agent in its project: the main checkout, the git working tree and
+	// the branch checked out there ("" when detached or not in git), as the node reads them.
+	RepoRoot       string        `json:"repo_root,omitempty"`
+	Worktree       string        `json:"worktree,omitempty"`
+	Branch         string        `json:"branch,omitempty"`
 	Status         string        `json:"status"`
 	State          string        `json:"state,omitempty"`
 	StateSince     string        `json:"state_since,omitempty"`
@@ -149,10 +154,9 @@ type Item struct {
 		Thoughts int   `json:"thoughts"`
 		Through  int64 `json:"through_seq"`
 	} `json:"fold,omitempty"`
-	Injected *struct {
-		Kind string `json:"kind"`
-		Line string `json:"line"`
-	} `json:"injected,omitempty"`
+	Injected *Injected `json:"injected,omitempty"`
+	// Source names who wrote a user-role message that isn't the user's (MessageSource).
+	Source *Source `json:"source,omitempty"`
 }
 
 // ItemsPage is a page of a transcript.
@@ -465,10 +469,24 @@ type Launcher struct {
 // Launchers are a computer's launchers and the one new agents use by default.
 type Launchers struct {
 	Launchers []Launcher `json:"launchers"`
-	Default   *struct {
+	// Tiers are New agent's presets: the tiers of the model profile in use whose launcher this computer starts.
+	Tiers        []Tier `json:"tiers,omitempty"`
+	TiersProfile *struct {
+		Name string `json:"name"`
+	} `json:"tiers_profile,omitempty"`
+	Default *struct {
 		Provider string `json:"provider,omitempty"`
 		Model    string `json:"model,omitempty"`
 	} `json:"default,omitempty"`
+}
+
+// Tier is a preset for starting an agent: a launcher with its model and effort ("" for their defaults), and when to use it.
+type Tier struct {
+	Name        string `json:"name"`
+	Launcher    string `json:"launcher"`
+	Model       string `json:"model,omitempty"`
+	Effort      string `json:"effort,omitempty"`
+	Description string `json:"description,omitempty"`
 }
 
 // Dir is a folder on a computer.
@@ -494,6 +512,9 @@ type StartRequest struct {
 	AgentType string `json:"agent_type,omitempty"`
 	Prompt    string `json:"prompt,omitempty"`
 	TodoID    string `json:"todo_id,omitempty"`
+	// Model and Effort override the model settings for this start only (a preset's).
+	Model  string `json:"model,omitempty"`
+	Effort string `json:"effort,omitempty"`
 }
 
 // KBKinds are the knowledge base's kinds of entries, in the order the apps show them (docs/assistant/knowledge.md).
@@ -617,16 +638,18 @@ type GitCommit struct {
 
 // GitStatus is a checkout's branch, changes and latest commits (GET /machines/{mid}/git/status).
 type GitStatus struct {
-	IsRepo   bool        `json:"is_repo"`
-	Root     string      `json:"root,omitempty"`
-	Branch   string      `json:"branch,omitempty"`
-	Head     *GitCommit  `json:"head,omitempty"`
-	Upstream string      `json:"upstream,omitempty"`
-	Ahead    int         `json:"ahead"`
-	Behind   int         `json:"behind"`
-	Files    []GitFile   `json:"files"`
-	Stashes  int         `json:"stashes,omitempty"`
-	Commits  []GitCommit `json:"commits,omitempty"`
+	IsRepo   bool       `json:"is_repo"`
+	Root     string     `json:"root,omitempty"`
+	Branch   string     `json:"branch,omitempty"`
+	Head     *GitCommit `json:"head,omitempty"`
+	Upstream string     `json:"upstream,omitempty"`
+	// Gone: the upstream is configured but its branch was deleted on the remote.
+	Gone    bool        `json:"gone,omitempty"`
+	Ahead   int         `json:"ahead"`
+	Behind  int         `json:"behind"`
+	Files   []GitFile   `json:"files"`
+	Stashes int         `json:"stashes,omitempty"`
+	Commits []GitCommit `json:"commits,omitempty"`
 }
 
 // GitDiff is one file's diff.
@@ -640,4 +663,14 @@ type GitDiff struct {
 type Image struct {
 	Mime string `json:"mime"`
 	Data string `json:"data,omitempty"`
+}
+
+// Injected is a line the hub or the assistant put into a chat as the user's: a task's notice, a follow-up, supervision.
+type Injected struct {
+	Kind   string `json:"kind"`
+	State  string `json:"state,omitempty"`
+	Level  string `json:"level,omitempty"`
+	Title  string `json:"title,omitempty"`
+	Line   string `json:"line"`
+	Detail string `json:"detail,omitempty"`
 }

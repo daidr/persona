@@ -321,5 +321,19 @@
   "deviceAddedOn": "added on {time}",
   "deviceRevokedOn": "revoked on {time}",
   "connSyncedOn": "synced on {time}",
-  "extManager": "manager {manager}"
+  "extManager": "manager {manager}",
+  "contextUntitled": "Context",
+  "photosAttached": "{count} photos",
+  "sourceConversation": "Another chat",
+  "sourcePatrol": "Scheduled run",
+  "sourceFollowup": "Follow-up",
+  "sourceSupervision": "Supervision",
+  "sourceOther": "Automatic",
+  "sourceMore": "Show more",
+  "sourceLess": "Show less",
+  "changesUpstreamGone": "Its upstream branch was deleted on the remote",
+  "startPreset": "Preset",
+  "startPresetNone": "None",
+  "startPresetHint": "Tiers of the model profile {profile}: a launcher with its model and effort",
+  "onBranch": "branch {branch}"
 }

@@ -1092,3 +1092,65 @@ func TestHubSettings(t *testing.T) {
 		t.Fatal("the editor stayed open")
 	}
 }
+
+// Messages another conversation or a scheduled run wrote are never user bubbles; the user's own lose their blocks.
+func TestMessageSources(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	key := "macbook/src-test"
+	tr := a.conn.data.Transcript(key)
+	tr.Loaded = true
+	tr.Merge([]hubapi.Item{
+		{ID: "s1", Seq: 1, Role: "user", Kind: "text", Text: "Collect the numbers", Source: &hubapi.Source{Kind: "conversation", Title: "Research"}},
+		{ID: "s2", Seq: 2, Role: "user", Kind: "text", Text: "<persona-context kind=\"context\" title=\"Notes\">n</persona-context>My own words"},
+		{ID: "s3", Seq: 3, Role: "user", Kind: "text", Text: "x", Injected: &hubapi.Injected{Kind: "followup", State: "daily", Line: "Daily check", Detail: "Check the inbox"}},
+	})
+	st := a.chat(key)
+	tt := ui.NewTester(func(c *ui.Context) {
+		p := a.theme(c)
+		ui.Column(c).Fill().Children(func() {
+			for _, it := range tr.Items {
+				a.itemView(c, p, st, it, "")
+			}
+		})
+	}, 900, 600)
+	tt.Frame()
+	for _, want := range []string{"@Research", "Collect the numbers", "My own words", "Notes", "@" + a.tr("sourcePatrol"), "Check the inbox"} {
+		if !tt.HasText(want) {
+			t.Errorf("no %q in %v", want, tt.Texts())
+		}
+	}
+	if tt.HasText("<persona-context") || strings.Contains(strings.Join(tt.Texts(), " "), "</persona-context>") {
+		t.Errorf("raw blocks shown: %v", tt.Texts())
+	}
+	shot(t, tt, "message-sources")
+}
+
+func TestStartPreset(t *testing.T) {
+	a, _ := signedIn(t, "en")
+	a.openStart("", "")
+	f := &a.start
+	if len(f.launchers) == 0 {
+		t.Fatal("no launchers")
+	}
+	f.tiers = []hubapi.Tier{{Name: "fast", Launcher: f.launchers[len(f.launchers)-1].Name, Model: "small", Effort: "low", Description: "Quick fixes"}}
+	f.tiersProfile = "Performance"
+	tt := ui.NewTester(a.View, 1280, 900)
+	tt.Frame()
+	if !tt.HasText(a.tr("startPresetHint", "profile", "Performance")) {
+		t.Fatalf("no preset field: %v", tt.Texts())
+	}
+	f.tier, f.tierFor = "fast", launcherLabel(f.launchers[len(f.launchers)-1])
+	f.launcher = f.tierFor
+	tt.Frame()
+	if !tt.HasText("Quick fixes") {
+		t.Fatal("no preset hint")
+	}
+	if tier, ok := f.pickedTier(); !ok || tier.Model != "small" {
+		t.Fatalf("picked: %+v %v", tier, ok)
+	}
+	// a launcher picked by hand afterwards unmarks the preset
+	f.launcher = launcherLabel(f.launchers[0])
+	if _, ok := f.pickedTier(); ok && len(f.launchers) > 1 {
+		t.Fatal("the preset outlived a launcher picked by hand")
+	}
+}

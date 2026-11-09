@@ -253,3 +253,50 @@ func TestSplitViews(t *testing.T) {
 		t.Fatalf("open block %+v %+v", parts[5], parts[6])
 	}
 }
+
+func TestMessageSource(t *testing.T) {
+	block := func(json string) string {
+		return "<persona-context kind=\"message-source\" title=\"\">\n" + json + "\n</persona-context>\nDo the thing"
+	}
+	for name, c := range map[string]struct {
+		it   Item
+		want string
+	}{
+		"explicit":  {Item{Text: "x", Source: &Source{Kind: "conversation", Title: "Research"}}, "conversation/Research"},
+		"block":     {Item{Text: block(`{"kind":"patrol","title":"Daily \u003cnews\u003e"}`)}, "patrol/Daily <news>"},
+		"user":      {Item{Text: block(`{"author":"user","kind":"conversation"}`)}, ""},
+		"malformed": {Item{Text: block(`{nope`)}, ""},
+		"own send":  {Item{Text: block(`{"kind":"patrol"}`), ClientMsg: "c1"}, ""},
+		"supervise": {Item{Text: "x", Injected: &Injected{Kind: "system", State: "supervise", Title: "Review"}}, "supervision/Review"},
+		"daily":     {Item{Text: "x", Injected: &Injected{Kind: "followup", State: "daily"}}, "patrol/"},
+		"wake":      {Item{Text: "x", Injected: &Injected{Kind: "followup", State: "wake"}}, "followup/"},
+		"plain":     {Item{Text: "hello"}, ""},
+	} {
+		got := ""
+		if s := c.it.MessageSource(); s != nil {
+			got = s.Kind + "/" + s.Title
+		}
+		if got != c.want {
+			t.Errorf("%s: %q, want %q", name, got, c.want)
+		}
+	}
+}
+
+func TestParseUserText(t *testing.T) {
+	raw := "<persona-context kind=\"context\" title=\"Knowledge · A&amp;B\">notes</persona-context>\n" +
+		"<persona-file path=\"/tmp/report v2.pdf\" />look at [Image #1] this\n<pasted_content>pasted</pasted_content>\n" +
+		"<attached_images>\n/tmp/a.png\nnot a path\n</attached_images>"
+	u := ParseUserText(raw)
+	if u.Text != "look at this\npasted" {
+		t.Errorf("text: %q", u.Text)
+	}
+	if len(u.Contexts) != 1 || u.Contexts[0].Title != "Knowledge · A&B" || u.Contexts[0].Text != "notes" {
+		t.Errorf("contexts: %+v", u.Contexts)
+	}
+	if len(u.Files) != 1 || u.Files[0].Name != "report v2.pdf" {
+		t.Errorf("files: %+v", u.Files)
+	}
+	if len(u.Photos) != 1 || u.Photos[0] != "/tmp/a.png" {
+		t.Errorf("photos: %+v", u.Photos)
+	}
+}

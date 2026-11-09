@@ -292,6 +292,9 @@ func (a *App) changesPane(c *ui.Context, p palette, key string, x hubapi.Session
 				line += "  ↓" + itoa(gs.Behind)
 			}
 			ui.Text(c, line).Bold().SingleLine()
+			if gs.Gone {
+				ui.Text(c, a.tr("changesUpstreamGone")).FontSize(small).TextColor(p.orange).SingleLine()
+			}
 			if gs.Head != nil {
 				ui.Text(c, gs.Head.Short+" · "+gs.Head.Subject).FontSize(small).TextColor(p.ink2).SingleLine()
 			}
